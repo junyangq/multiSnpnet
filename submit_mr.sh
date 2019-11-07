@@ -11,7 +11,7 @@ dirLog="$mr/log/"
 # log files written to $dirLog/mr_${today}_${rank[$idx]}_${weighted[$idx]}.err, $dirLog/mr_${today}_${rank[$idx]}_${weighted[$idx]}.out
 
 rank=(8 16 39)
-prev=(-1 -1 -1)
+prev=(0 0 0) # which iteration to start with; -1 means starting from the last intermediate results
 mmem=(120000 120000 250000)
 weighted=(0 0 0)
 
