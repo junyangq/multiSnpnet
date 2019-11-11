@@ -1,0 +1,40 @@
+GBE_ID	phenotype
+INI20030620	Alanine aminotransferase
+INI20030600	Albumin
+INI10030610	Alkaline phosphatase
+INI20030630	Apolipoprotein A
+INI20030640	Apolipoprotein B
+INI20030650	Aspartate aminotransferase
+INI20030680	Calcium
+INI20030690	Cholesterol
+INI20030710	C-reactive protein
+INI20030700	Creatinine
+INI20030720	Cystatin-C
+INI20030660	Direct bilirubin
+INI20030730	Gamma glutamyltransferase
+INI10030740	Glucose
+INI20030750	Glycated haemoglobin (HbA1c)
+INI20030760	HDL cholesterol
+INI20030770	IGF-1
+INI20030780	LDL direct
+INI20030790	Lipoprotein-A
+INI20030810	Phosphate
+INI20030830	SHBG
+INI20030850	Testosterone
+INI10030840	Total bilirubin
+INI20030860	Total protein
+INI20030870	Triglycerides
+INI10030880	Urate
+INI20030670	Urea
+INI20030890	Vitamin D
+INI10030510	Creatinine in urine
+INI40030700	eGFR
+INI10030500	Microalbumin in urine
+INI10030520	Potassium in urine
+INI10030530	Sodium in urine
+INI10030910	Non-albumin protein
+BIN10030510	Urine albumin to creatinine ratio higher than 30 mg/g
+BIN10030500	Microalbumin higher than 40 mg/L
+BIN10030820	Rheumatoid factor higher than 16 U/mL
+BIN10030800	Oestradiol higher than 212 pmol/L
+HC294	renal/kidney_failure
