@@ -14,6 +14,7 @@ fill_missing <- function(data, colnames, key, values) {
 initial_Y_imputation <- function(response, covariates, missing_response) {
   residual <- matrix(NA, nrow(response), ncol(response))
   colnames(residual) <- colnames(response)
+  if (is.null(covariates)) covariates <- data.frame(intercept = rep(1, nrow(response)))
   for (k in 1:ncol(response)) {
     fit <- lm(response[, k] ~ ., data = covariates)
     pred <- predict(fit, newdata = covariates)
