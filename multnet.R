@@ -453,7 +453,8 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
   W_init <- NULL
   A_init <- NULL
   
-  Z1 <- cbind(intercept = 1, as.matrix(covariates_train))
+  Z1 <- matrix(1, nrow(response_train), 1, dimnames = list(NULL, "intercept"))
+  if (!is.null(covariates_train)) Z1 <- cbind(Z1, as.matrix(covariates_train))
   PZ <- solve(crossprod(Z1), t(Z1))
   metric_train <- matrix(NA, nlambda, q_train)
   metric_val <- matrix(NA, nlambda, q_train)
@@ -463,7 +464,7 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
   colnames(AUC_train) <- colnames(AUC_val) <- binary_phenotypes
   nactive <- rep(NA, 100)
   
-  if (r == ncol(response_train)) {
+  if (r == ncol(response_train) && !is.null(covariates_train)) {
     features_train <- covariates_train
     if (validation) features_val <- covariates_val
   }
@@ -486,7 +487,7 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
     load(file.path(results_dir, configs[["results.dir"]], paste0("output_lambda_", prev_iter, ".RData")))
     response_train <- fit$response
     start_lambda <- ilam + 1
-    if (r == ncol(response_train)) {
+    if (r == ncol(response_train) && !is.null(covariates_train)) {
       features_train[, (feature_names) := snpnet:::prepareFeatures(chr_train, feature_names, stats, rowIdx_subset_gen)]
       if (validation) features_val[, (feature_names) := snpnet:::prepareFeatures(chr_val, feature_names, stats, rowIdx_subset_gen_val)]
     } else {
@@ -578,7 +579,7 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
       } else {
         # browser()
         fit <- SRRR_iterative_missing_covariates(as.matrix(features_train), response_train, 
-                                                 missing_response_train, cbind(intercept = 1, as.matrix(covariates_train)), PZ, lam, 
+                                                 missing_response_train, Z1, PZ, lam,
                                                  r, max.iter, B_init, 
                                                  thresh, object0, glmnet_thresh = glmnet_thresh)
       }
