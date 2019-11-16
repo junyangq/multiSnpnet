@@ -335,6 +335,8 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
   configs <- setup_configs_directories(configs, covariate_names, save, results_dir, validation)
   
   start_all <- Sys.time()
+
+  if (r > length(phenotype_names)) stop("The specified rank (", r, ") should not be greater than the number of responses (", length(phenotype_names), ").")
   
   cat("Start Sparse Reduced Rank Regression for ", paste(phenotype_names, collapse = ", "), ".\n", sep = "")
   
