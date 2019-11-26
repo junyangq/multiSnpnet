@@ -15,6 +15,11 @@ if (length(args) < 3) {
   rank <- as.integer(args[1])
   prev_iter <- as.integer(args[2])
   weighted <- as.integer(args[3])
+  if (length(args) > 3) {
+    use_plink2 <- as.integer(args[4])
+  } else {
+    use_plink2 <- FALSE
+  }
 }
 
 source("multnet.R")
@@ -23,6 +28,10 @@ source("multnet.R")
 
 genotype_file <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/train.bed"   # training bed
 genotype_file_val <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/val.bed"   # validation bed
+
+genotype_p2file <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/train"   # training bed
+genotype_p2file_val <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/val"   # validation bed
+
 phenotype_file <- "/oak/stanford/groups/mrivas/private_data/ukbb/24983/phenotypedata/master_phe/master.20190509.phe"   # path to the phenotype file
 
 phe_list <- fread("phe_long_3.csv")  # read list of phenotypes to analyze, two columns: (GBE_ID, phenotype)
@@ -49,7 +58,9 @@ configs <- list(
   bufferSize = 10000,  # number of COLUMNS (Variants) the memory can hold at a time
   standardize.variant = FALSE,  # standardize predictors or not
   results.dir = paste0("results_rank_", rank, "/"),  # subdirectory for each rank
-  meta.dir = "meta/"
+  meta.dir = "meta/",
+  use_plink2 = use_plink2,
+  mem = 128000  # memeory guidance for PLINK2
 )
 
 ######------------------------------########
@@ -77,5 +88,8 @@ fall <- SRRR_path(genotype_file = genotype_file,
                   prev_iter = prev_iter,
                   early_stopping = early_stopping,
                   glmnet_thresh = thresh,
-                  weight = weight)
+                  weight = weight,
+                  use_plink2 = use_plink2,
+                  genotype_p2file = genotype_p2file,
+                  genotype_p2file_val = genotype_p2file_val)
 

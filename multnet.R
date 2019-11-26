@@ -305,12 +305,16 @@ y_de_standardization <- function(response, means, sds, weight) {
 }
 
 setup_configs_directories <- function(configs, covariates, save, results.dir, validation) {
+  if (configs[["use_plink2"]] && !("mem" %in% names(config)))
+    stop("mem should be provided to guide the memory capacity for PLINK2.")
   configs[["covariates"]] <- covariates
-  default_settings <- c(missing.rate = 0.1, MAF.thresh = 0.001, nCores = 1,
-                        nlams.init = 10, nlams.delta = 5)
+  default_settings <- list(missing.rate = 0.1, MAF.thresh = 0.001, nCores = 1,
+                        nlams.init = 10, nlams.delta = 5,
+                        gcount.full.prefix = NULL, vzs = TRUE)
   for (name in names(default_settings)) {
-    if (!(name %in% names(configs))) configs[[name]] <- as.numeric(default_settings[name])
+    if (!(name %in% names(configs))) configs[[name]] <- default_settings[[name]]
   }
+
   if (!("bufferSize" %in% names(configs)))
     stop("bufferSize should be provided to guide the memory capacity.")
   if (!("chunkSize" %in% names(configs)))
@@ -322,15 +326,135 @@ setup_configs_directories <- function(configs, covariates, save, results.dir, va
     dir.create(file.path(results.dir, configs[["results.dir"]], "train"), showWarnings = FALSE, recursive = T)
     if (validation) dir.create(file.path(results.dir, configs[["results.dir"]], "val"), showWarnings = FALSE, recursive = T)
   }
+  config[["parent.dir"]] <- results.dir
   configs
 }
+
+###### From Yosuke's implementation using PLINK 2.0 for inner product ######
+computeStats_P2 <- function(pfile, ids, configs) {
+  keep_f       <- paste0(configs[['gcount.full.prefix']], '.keep')
+  gcount_tsv_f <- paste0(configs[['gcount.full.prefix']], '.gcount.tsv')
+
+  dir.create(dirname(configs[['gcount.full.prefix']]), showWarnings = FALSE, recursive = TRUE)
+  if (file.exists(gcount_tsv_f)) {
+      gcount_df <- fread(gcount_tsv_f)
+  } else {
+      # To run plink2 --geno-counts, we write the list of IDs to a file
+      data.frame(ID = ids) %>%
+      separate(ID, into=c('FID', 'IID'), sep='_') %>%
+      fwrite(keep_f, sep='\t', col.names=F)
+
+      # Run plink2 --geno-counts
+      system(paste(
+          'plink2',
+          '--threads', configs[['nCores']],
+          '--memory', configs[['mem']],
+          '--pfile', pfile, ifelse(configs[['vzs']], 'vzs', ''),
+          '--keep', keep_f,
+          '--out', configs[['gcount.full.prefix']],
+          '--geno-counts cols=chrom,pos,ref,alt,homref,refalt,altxy,hapref,hapalt,missing,nobs',
+          sep=' '
+      ), intern=F, wait=T)
+
+      # read the gcount file
+      gcount_df <-
+        data.table::fread(paste0(configs[['gcount.full.prefix']], '.gcount')) %>%
+        rename(original_ID = ID) %>%
+        mutate(
+          ID = paste0(original_ID, '_', ALT),
+          stats_pNAs  = MISSING_CT / (MISSING_CT + OBS_CT),
+          stats_means = (HAP_ALT_CTS + HET_REF_ALT_CTS + 2 * TWO_ALT_GENO_CTS ) / OBS_CT,
+          stats_msts  = (HAP_ALT_CTS + HET_REF_ALT_CTS + 4 * TWO_ALT_GENO_CTS ) / OBS_CT,
+          stats_SDs   = stats_msts - stats_means * stats_means
+        )
+  }
+
+  out <- list()
+  out[["pnas"]]  <- gcount_df %>% select(stats_pNAs) %>% pull()
+  out[["means"]] <- gcount_df %>% select(stats_means) %>% pull()
+  out[["sds"]]   <- gcount_df %>% select(stats_SDs) %>% pull()
+
+  for(key in names(out)){
+    names(out[[key]]) <- gcount_df %>% select(ID) %>% pull()
+  }
+  out[["excludeSNP"]] <- names(out[["means"]])[(out[["pnas"]] > configs[["missing.rate"]]) | (out[["means"]] < 2 * configs[["MAF.thresh"]])]
+
+  if (configs[['save']]){
+      gcount_df %>% fwrite(gcount_tsv_f, sep='\t')
+      saveRDS(out[["excludeSNP"]], file = file.path(dirname(configs[['gcount.full.prefix']]), "excludeSNP.rda"))
+  }
+
+  out
+}
+
+snpnetLogger <- function(message, log.time = NULL, indent=0){
+    if (is.null(log.time)) log.time <- Sys.time()
+    cat('[', as.character(log.time), ' snpnet] ', rep(' ', indent * 2), message, '\n', sep='')
+}
+
+snpnetLoggerTimeDiff <- function(message, start.time, end.time = NULL, indent=0){
+    if (is.null(end.time)) end.time <- Sys.time()
+    snpnetLogger(paste(message, "Time elapsed:", timeDiff(start.time, end.time), sep=' '), log.time=end.time, indent=indent)
+}
+
+
+computeProduct_P2 <- function(residual, pfile, vars, stats, configs, iter) {
+  time.computeProduct.start <- Sys.time()
+  snpnetLogger('Start computeProduct()', indent=2, log.time=time.computeProduct.start)
+
+  snpnetLogger('Start plink2 --variant-score', indent=3, log.time=time.computeProduct.start)
+  dir.create(file.path(configs[['parent.dir']], configs[["results.dir"]]), showWarnings = FALSE, recursive = T)
+
+  residual_f <- file.path(configs[["parent.dir"]], configs[["results.dir"]], paste0("residuals_iter_", iter, ".tsv"))
+
+  # write residuals to a file
+  residual_df <- data.frame(residual)
+  # colnames(residual_df) <- paste0('lambda_idx_', colnames(residual))
+  residual_df %>%
+    rownames_to_column("ID") %>%
+    separate(ID, into=c('#FID', 'IID'), sep='_') %>%
+    fwrite(residual_f, sep='\t', col.names=T)
+
+  # Run plink2 --geno-counts
+    system(paste(
+      'plink2',
+        '--threads', configs[['nCores']],
+        '--memory', configs[['mem']],
+        '--pfile', pfile, ifelse(configs[['vzs']], 'vzs', ''),
+        '--read-freq', paste0(configs[['gcount.full.prefix']], '.gcount'),
+        '--keep', residual_f,
+        '--out', str_replace_all(residual_f, '.tsv$', ''),
+        '--variant-score', residual_f, 'zs', 'bin',
+        sep=' '
+    ), intern=F, wait=T)
+
+  prod.full <- readBinMat(str_replace_all(residual_f, '.tsv$', '.vscore'), configs)
+  if (! configs[['save']]) system(paste(
+      'rm', residual_f, str_replace_all(residual_f, '.tsv$', '.log'), sep=' '
+  ), intern=F, wait=T)
+
+  snpnetLoggerTimeDiff('End plink2 --variant-score.', time.computeProduct.start, indent=4)
+
+  rownames(prod.full) <- vars
+  if (configs[["standardize.variant"]]) {
+      for(residual.col in 1:ncol(residual)){
+        prod.full[, residual.col] <- apply(prod.full[, residual.col], 2, "/", stats[["sds"]])
+      }
+  }
+  prod.full[stats[["excludeSNP"]], ] <- NA
+  snpnetLoggerTimeDiff('End computeProduct().', time.computeProduct.start, indent=3)
+  prod.full
+}
+###### ------------------------------------------------------------------- ######
+
 
 SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_names, results_dir, 
                       r, nlambda = 100, batch_size = 100, lambda.min.ratio = 0.01, 
                       max.iter = 10, is.warm.start = TRUE, is.A.converge = TRUE, thresh = 1e-7, glmnet_thresh = 1e-7,
                       standardize_response = FALSE, 
                       configs, save = TRUE, validation = FALSE, genotype_file_val = NULL, early_stopping = FALSE,
-                      prev_iter = 0, weight = NULL, binary_phenotypes = NULL) {
+                      prev_iter = 0, weight = NULL, binary_phenotypes = NULL,
+                      use_plink2 = FALSE, genotype_p2file, genotype_p2file_val = NULL) {
   
   configs <- setup_configs_directories(configs, covariate_names, save, results_dir, validation)
   
@@ -367,12 +491,17 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
   }
   
   ## summary statistics: missing rate, mean, standard deviation (if needed) ##
-  stats <- snpnet:::computeStats(chr_train, rowIdx_subset_gen, c("pnas", "means", "sds"),
-                                 path = file.path(results_dir, "meta"), save = save, configs = configs, verbose = TRUE, buffer.verbose = TRUE)
-  
   phe_train <- phe_master[match(ids_valid, cat_ids), ]
   if (validation) phe_val <- phe_master[match(ids_valid_val, cat_ids), ]
-  
+
+  if (!use_plink2) {
+    stats <- snpnet:::computeStats(chr_train, rowIdx_subset_gen, c("pnas", "means", "sds"),
+                                 path = file.path(results_dir, "meta"), save = save, configs = configs, verbose = TRUE, buffer.verbose = TRUE)
+  } else {
+    stats <- computeStats_P2(genotype_p2file, ids_valid, configs = configs)
+    vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0('zstdcat ', paste0(genotype_p2file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
+  }
+
   if (is.null(binary_phenotypes)) {
     binary_phenotypes <- phenotype_names[apply(as.matrix(phe_train[, phenotype_names, with = F]), 2, function(x) all(unique(x[!is.na(x)]) %in% c(1, 2)))]
     print(binary_phenotypes)
@@ -433,8 +562,15 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
   fit_init <- initial_Y_imputation(response_train, covariates_train, missing_response_train)
   response_train <- fit_init$response
   object0 <- mean((fit_init$residual)^2)/2*ncol(response_train)
-  prod_full <- snpnet:::computeProduct(fit_init$residual, chr_train, rowIdx_subset_gen, stats, 
+
+  if (!use_plink2) {
+    prod_full <- snpnet:::computeProduct(fit_init$residual, chr_train, rowIdx_subset_gen, stats,
                                        configs, verbose = TRUE, path = genotype_file)
+  } else {
+    rownames(fit_init$residuals) <- ids_valid
+    colnames(fit_init$residuals) <- colnames(response_train)
+    prod_full <- computeProduct_P2(fit_init$residual, genotype_p2file, vars, stats, configs, iter=0) / length(rowIdx_subset_gen)
+  }
   score <- row_norm2(prod_full)
   if (is.null(lambda.min.ratio)) {
     lambda.min.ratio <- ifelse(n_subset_train < ncol(chr_train)-length(stats[["excludeSNP"]]), 0.01, 0.0001)
@@ -453,7 +589,7 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
   W_init <- NULL
   A_init <- NULL
   
-  Z1 <- matrix(1, nrow(response_train), 1, dimnames = list(NULL, "intercept"))
+  Z1 <- matrix(1, nrow(response_train), 1, dimnames = list(NULL, c("intercept")))
   if (!is.null(covariates_train)) Z1 <- cbind(Z1, as.matrix(covariates_train))
   PZ <- solve(crossprod(Z1), t(Z1))
   metric_train <- matrix(NA, nlambda, q_train)
@@ -585,9 +721,15 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
       }
       response_train <- fit$response
       residuals <- as.matrix(fit$residuals)
+      rownames(residuals) <- ids_valid
+      colnames(residuals) <- colnames(response_train)
       start_KKT <- Sys.time()
       cat("Start checking KKT condition ...\n")
-      prod_resid <- snpnet:::computeProduct(residuals, chr_train, rowIdx_subset_gen, stats, configs, path = "", verbose = TRUE)
+      if (!use_plink2) {
+        prod_resid <- snpnet:::computeProduct(residuals, chr_train, rowIdx_subset_gen, stats, configs, path = "", verbose = TRUE)
+      } else {
+        prod_resid <- computeProduct_P2(residuals, genotype_p2file, vars, stats, configs, iter=0) / length(rowIdx_subset_gen)
+      }
       # check.obj <- KKT_mcheck(residual.full, chr.train, rowIdx.subset.train, current.lams[start.lams:num.lams], ifelse(family == "gaussian" && use.glmnetPlus, 1, lambda.idx),
       # stats, glmfit, configs, verbose, KKT.verbose, path = file.path(genotype.dir, "train.bed"))
       # prod_resid <- crossprod(X, Y %*% fit$A - features_train %*% fit$B)
@@ -626,7 +768,11 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
       if (r == ncol(response_train)) {
         pred_val <- sweep(as.matrix(features_val) %*% fit$CC, 2, fit$a0, FUN = "+")
       } else {
-        pred_val <- sweep(as.matrix(covariates_val) %*% fit$W + as.matrix(features_val) %*% fit$C, 2, fit$a0, FUN = "+")
+        if (!is.null(covariates_val)) {
+          pred_val <- sweep(as.matrix(covariates_val) %*% fit$W + as.matrix(features_val) %*% fit$C, 2, fit$a0, FUN = "+")
+        } else {
+          pred_val <- sweep(as.matrix(features_val) %*% fit$C, 2, fit$a0, FUN = "+")
+        }
       }
       # browser()
       if (standardize_response) pred_val <- y_de_standardization(pred_val, std_obj$means, std_obj$sds, weight)
