@@ -3,6 +3,11 @@ library(glmnetPlus)
 library(reshape2)
 library(ggplot2)
 library(data.table)
+library(magrittr)
+library(tidyr)
+library(dplyr)
+library(tibble)
+library(stringr)
 
 args <- commandArgs(trailingOnly=TRUE)
 
@@ -26,18 +31,18 @@ source("multnet.R")
 
 #####----------- Configs -----------#####
 
-genotype_file <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/train.bed"   # training bed
-genotype_file_val <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/val.bed"   # validation bed
+genotype_file <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/train.bed"   # training bed
+genotype_file_val <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/val.bed"   # validation bed
 
-genotype_p2file <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/train"   # training bed
-genotype_p2file_val <- "/oak/stanford/groups/mrivas/users/ytanigaw/repos/rivas-lab/biobank-methods-dev/private_data/data-split/val"   # validation bed
+genotype_p2file <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/train"   # training bed
+genotype_p2file_val <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/val"   # validation bed
 
-phenotype_file <- "/oak/stanford/groups/mrivas/private_data/ukbb/24983/phenotypedata/master_phe/master.20190509.phe"   # path to the phenotype file
+phenotype_file <- "/oak/stanford/groups/mrivas/projects/biomarkers/snpnet/biomarkers/biomarkers_covar.phe"   # path to the phenotype file
 
-phe_list <- fread("phe_long_3.csv")  # read list of phenotypes to analyze, two columns: (GBE_ID, phenotype)
+phe_list <- fread("phe_long_721.csv")  # read list of phenotypes to analyze, two columns: (GBE_ID, phenotype)
 results_dir <- "/scratch/users/junyangq/multiresponse/results_mr_long_3_renew/"  # parent results directory to save intermediate results
-covariate_names <- c("age", "sex", paste0("PC", 1:10))
-
+# covariate_names <- c("age", "sex", paste0("PC", 1:10))
+covariate_names <- c()
 
 standardize_response <- TRUE  # should we standardize response beforehand (rescale when prediction for sure)
 save <- TRUE  # should the program save intermediate results?
@@ -54,13 +59,14 @@ early_stopping <- TRUE  # should we adopt early stopping
 configs <- list(
   missing.rate = 0.1,  # variants above this missing rate are discarded
   MAF.thresh = 0.001,  # MAF threshold
-  nCores = 8,  # number of cores to be used
-  bufferSize = 10000,  # number of COLUMNS (Variants) the memory can hold at a time
+  nCores = 16,  # number of cores to be used
+  bufferSize = 50000,  # number of COLUMNS (Variants) the memory can hold at a time
   standardize.variant = FALSE,  # standardize predictors or not
   results.dir = paste0("results_rank_", rank, "/"),  # subdirectory for each rank
   meta.dir = "meta/",
   use_plink2 = use_plink2,
-  mem = 128000  # memeory guidance for PLINK2
+  mem = 250000,  # memeory guidance for PLINK2
+  KKT.verbose = FALSE
 )
 
 ######------------------------------########

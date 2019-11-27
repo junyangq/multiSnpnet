@@ -305,9 +305,10 @@ y_de_standardization <- function(response, means, sds, weight) {
 }
 
 setup_configs_directories <- function(configs, covariates, save, results.dir, validation) {
-  if (configs[["use_plink2"]] && !("mem" %in% names(config)))
+  if (configs[["use_plink2"]] && !("mem" %in% names(configs)))
     stop("mem should be provided to guide the memory capacity for PLINK2.")
   configs[["covariates"]] <- covariates
+  configs[['gcount.basename.prefix']] <- "snpnet.train"
   default_settings <- list(missing.rate = 0.1, MAF.thresh = 0.001, nCores = 1,
                         nlams.init = 10, nlams.delta = 5,
                         gcount.full.prefix = NULL, vzs = TRUE)
@@ -326,12 +327,29 @@ setup_configs_directories <- function(configs, covariates, save, results.dir, va
     dir.create(file.path(results.dir, configs[["results.dir"]], "train"), showWarnings = FALSE, recursive = T)
     if (validation) dir.create(file.path(results.dir, configs[["results.dir"]], "val"), showWarnings = FALSE, recursive = T)
   }
-  config[["parent.dir"]] <- results.dir
+  configs[["gcount.full.prefix"]] <- file.path(configs[['results.dir']], configs[['meta.dir']], configs[['gcount.basename.prefix']])
+  configs[["zstdcat.path"]] <- 'zstdcat'
+  configs[["save.computeProduct"]] <- FALSE
+  configs[["parent.dir"]] <- results.dir
+  configs[["endian"]] <- "little"
+  configs[["save"]] <- save
   configs
 }
 
 ###### From Yosuke's implementation using PLINK 2.0 for inner product ######
+timeDiff <- function(start.time, end.time = NULL) {
+    if (is.null(end.time)) end.time <- Sys.time()    
+    paste(round(end.time-start.time, 4), units(end.time-start.time))
+}
+
+snpnetLoggerTimeDiff <- function(message, start.time, end.time = NULL, indent=0){
+    if (is.null(end.time)) end.time <- Sys.time()
+    snpnetLogger(paste(message, "Time elapsed:", timeDiff(start.time, end.time), sep=' '), log.time=end.time, indent=indent)
+}
+
 computeStats_P2 <- function(pfile, ids, configs) {
+  time.computeStats.start <- Sys.time()
+  snpnetLogger('Start computeStats()', indent=2, log.time=time.computeStats.start)
   keep_f       <- paste0(configs[['gcount.full.prefix']], '.keep')
   gcount_tsv_f <- paste0(configs[['gcount.full.prefix']], '.gcount.tsv')
 
@@ -383,7 +401,7 @@ computeStats_P2 <- function(pfile, ids, configs) {
       gcount_df %>% fwrite(gcount_tsv_f, sep='\t')
       saveRDS(out[["excludeSNP"]], file = file.path(dirname(configs[['gcount.full.prefix']]), "excludeSNP.rda"))
   }
-
+  snpnetLoggerTimeDiff('End computeStats().', time.computeStats.start, indent=3)
   out
 }
 
@@ -397,10 +415,31 @@ snpnetLoggerTimeDiff <- function(message, start.time, end.time = NULL, indent=0)
     snpnetLogger(paste(message, "Time elapsed:", timeDiff(start.time, end.time), sep=' '), log.time=end.time, indent=indent)
 }
 
+readBinMat <- function(fhead, configs){
+    # This is a helper function to read binary matrix file (from plink2 --variant-score zs bin)
+    rows <- fread(cmd=paste0(configs[['zstdcat.path']], ' ', fhead, '.vars.zst'), head=F)$V1
+    cols <- fread(paste0(fhead, '.cols'), head=F)$V1
+    bin.reader <- file(paste0(fhead, '.bin'), 'rb')
+    M = matrix(
+        readBin(bin.reader, 'double', n=length(rows)*length(cols), endian = configs[['endian']]),
+        nrow=length(rows), ncol=length(cols), byrow = T
+    )
+    close(bin.reader)
+    colnames(M) <- cols
+    rownames(M) <- rows
+    if (! configs[['save.computeProduct']]) system(paste(
+        'rm', paste0(fhead, '.cols'), paste0(fhead, '.vars.zst'), 
+        paste0(fhead, '.bin'), sep=' '
+    ), intern=F, wait=T)
+    M
+}
 
 computeProduct_P2 <- function(residual, pfile, vars, stats, configs, iter) {
   time.computeProduct.start <- Sys.time()
   snpnetLogger('Start computeProduct()', indent=2, log.time=time.computeProduct.start)
+
+  gc_res <- gc()
+  if(configs[['KKT.verbose']]) print(gc_res)
 
   snpnetLogger('Start plink2 --variant-score', indent=3, log.time=time.computeProduct.start)
   dir.create(file.path(configs[['parent.dir']], configs[["results.dir"]]), showWarnings = FALSE, recursive = T)
@@ -419,7 +458,7 @@ computeProduct_P2 <- function(residual, pfile, vars, stats, configs, iter) {
     system(paste(
       'plink2',
         '--threads', configs[['nCores']],
-        '--memory', configs[['mem']],
+        '--memory', as.integer(configs[['mem']]) - ceiling(sum(as.matrix(gc_res)[,2])),
         '--pfile', pfile, ifelse(configs[['vzs']], 'vzs', ''),
         '--read-freq', paste0(configs[['gcount.full.prefix']], '.gcount'),
         '--keep', residual_f,
@@ -442,7 +481,7 @@ computeProduct_P2 <- function(residual, pfile, vars, stats, configs, iter) {
       }
   }
   prod.full[stats[["excludeSNP"]], ] <- NA
-  snpnetLoggerTimeDiff('End computeProduct().', time.computeProduct.start, indent=3)
+  snpnetLoggerTimeDiff('End computeProduct().', time.computeProduct.start, indent=2)
   prod.full
 }
 ###### ------------------------------------------------------------------- ######
@@ -567,8 +606,8 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
     prod_full <- snpnet:::computeProduct(fit_init$residual, chr_train, rowIdx_subset_gen, stats,
                                        configs, verbose = TRUE, path = genotype_file)
   } else {
-    rownames(fit_init$residuals) <- ids_valid
-    colnames(fit_init$residuals) <- colnames(response_train)
+    rownames(fit_init$residual) <- ids_valid
+    colnames(fit_init$residual) <- colnames(response_train)
     prod_full <- computeProduct_P2(fit_init$residual, genotype_p2file, vars, stats, configs, iter=0) / length(rowIdx_subset_gen)
   }
   score <- row_norm2(prod_full)
