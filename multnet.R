@@ -117,7 +117,20 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
     count <- count + 1
     A_niter[k] <- 0
     # fix B, solve A
-    score <- as.matrix(X %*% B)
+
+    MAXLEN <- 2^31 - 1  # deal with long vector
+    ncol.chunk <- floor(MAXLEN / as.double(nrow(X)) / 4)
+    numChunks <- ceiling(ncol(X) / ncol.chunk)
+
+    for (jc in 1:numChunks) {
+      idx <- ((jc-1)*ncol.chunk+1):min(jc*ncol.chunk, ncol(X))
+      if (jc == 1) {
+        score <- as.matrix(X[, idx] %*% B[idx, ])
+      } else {
+        score <- score + as.matrix(X[, idx] %*% B[idx, ])
+      }
+    }
+
     # crossmat <- crossprod(crossprod(X, Y), B)
     # is_Y_converge <- FALSE
     impute_iter_count <- 0
