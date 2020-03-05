@@ -1,3 +1,8 @@
+# "Rscript ../job_mr.R ${rank[$idx]} -1 ${weighted[$idx]} ${use_plink2[$idx]} ${mmem[$idx]} 16 2000 ../phe_long_721.csv
+library(devtools)
+#devtools::load_all('/oak/stanford/groups/mrivas/software/snpnet/snpnet_v.0.3.4/')
+#snpnet must be from install.packages("remotes")
+#remotes::install_github("junyangq/snpnet")
 library(snpnet)
 library(glmnetPlus)
 library(reshape2)
@@ -11,7 +16,7 @@ library(stringr)
 
 args <- commandArgs(trailingOnly=TRUE)
 
-# provide 3 arguments: desired rank, prev_iter (if none, set 0), weighted (set 0 for now)
+# provide 8 arguments: desired rank, prev_iter (if none, set 0), weighted (set 0 for now), use_plink2 (TRUE, FALSE), memory, ncores, batchsize, pheno_list
 
 if (length(args) < 3) {
   stop("At least two arguments must be supplied (rank, prev_iter, weighted).", call.=FALSE)
@@ -27,20 +32,25 @@ if (length(args) < 3) {
   }
 }
 
-source("multnet.R")
+source("../multnet.R")
 
 #####----------- Configs -----------#####
 
-genotype_file <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/train.bed"   # training bed
-genotype_file_val <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/val.bed"   # validation bed
+genotype_file <- "/scratch/groups/mrivas/ukbb24983/array_combined/pgen/split/train.bed"   # training bed
+genotype_file_val <- "/scratch/groups/mrivas/ukbb24983/array_combined/pgen/split/val.bed"   # validation bed
 
-genotype_p2file <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/train"   # training bed
-genotype_p2file_val <- "/scratch/users/ytanigaw/tmp/snpnet/geno/array_combined/val"   # validation bed
+genotype_p2file <- "/scratch/groups/mrivas/ukbb24983/array_combined/pgen/split/train"   # training bed
+genotype_p2file_val <- "//scratch/groups/mrivas/ukbb24983/array_combined/pgen/split/val"   # validation bed
 
+phe_list_in <- args[8]
+if(phe_list_in == "../phe_long_721.csv"){
 phenotype_file <- "/oak/stanford/groups/mrivas/projects/biomarkers/snpnet/biomarkers/biomarkers_covar.phe"   # path to the phenotype file
+} else{
+phenotype_file <- "/oak/stanford/groups/mrivas/private_data/ukbb/24983/phenotypedata/master_phe/master.20190509.phe"
+}
 
-phe_list <- fread("phe_long_721.csv")  # read list of phenotypes to analyze, two columns: (GBE_ID, phenotype)
-results_dir <- "/scratch/users/junyangq/multiresponse/results_mr_long_3_renew/"  # parent results directory to save intermediate results
+phe_list <- fread(phe_list_in, sep = ",")  # read list of phenotypes to analyze, two columns: (GBE_ID, phenotype)
+results_dir <- paste0(getwd(), "/results_rank_",rank)  # parent results directory to save intermediate results
 # covariate_names <- c("age", "sex", paste0("PC", 1:10))
 covariate_names <- c()
 
@@ -49,7 +59,7 @@ save <- TRUE  # should the program save intermediate results?
 
 nlambda <- 100
 lambda.min.ratio <- 0.01
-batch_size <- 1000  # size of candidate variant batch in the screening
+batch_size <- as.integer(args[7])  # size of candidate variant batch in the screening
 max.iter <- 50  # maximum BAY iteration
 thresh <- 1e-7  # convergence threshold
 validation <- TRUE  # is validation set provided
@@ -57,15 +67,15 @@ early_stopping <- TRUE  # should we adopt early stopping
 
 # other computational configurations
 configs <- list(
-  missing.rate = 0.1,  # variants above this missing rate are discarded
+  missing.rate = 0.2,  # variants above this missing rate are discarded
   MAF.thresh = 0.001,  # MAF threshold
-  nCores = 16,  # number of cores to be used
+  nCores = as.integer(args[6]),  # number of cores to be used
   bufferSize = 50000,  # number of COLUMNS (Variants) the memory can hold at a time
   standardize.variant = FALSE,  # standardize predictors or not
   results.dir = paste0("results_rank_", rank, "/"),  # subdirectory for each rank
   meta.dir = "meta/",
   use_plink2 = use_plink2,
-  mem = 250000,  # memeory guidance for PLINK2
+  mem = as.integer(args[5]),  # memeory guidance for PLINK2
   KKT.verbose = FALSE
 )
 
