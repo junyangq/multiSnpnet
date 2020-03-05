@@ -1,4 +1,5 @@
 library(snpnet)
+library(BEDMatrixPlus)
 library(glmnetPlus)
 library(reshape2)
 library(ggplot2)
