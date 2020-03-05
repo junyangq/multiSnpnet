@@ -876,7 +876,7 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
     if (save) {
       feature_names <- setdiff(colnames(features_train), covariate_names)
       save(fit, ilam, current_active, active, feature_names, norm_prod, B_init, W_init, A_init, 
-           metric_train, metric_val, AUC_train, AUC_val, nactive, 
+           metric_train, metric_val, AUC_train, AUC_val, nactive, weight, configs,
            file = file.path(results_dir, configs[["results.dir"]], paste0("output_lambda_", ilam, ".RData")))
     }
     
