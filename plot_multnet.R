@@ -26,6 +26,7 @@ ranks <- c(5, 10, 20, 35)  # ranks to be plotted
 # output directory of plots
 plot_dir <- "/scratch/users/junyangq/multiresponse/plots_biomarkers/"
 
+R2_lim <- c(0, NA)  # plot limit of validation R2
 ###################################################
 
 dir.create(plot_dir)
@@ -111,6 +112,7 @@ if (is_multiplot) {
     ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
       geom_path() + geom_point() +
       xlab("metric (train)") + ylab("metric (val)") +
+      ylim(R2_lim) + 
       theme(axis.text=element_text(size=12), axis.title=element_text(size=12),
             legend.text=element_text(size=12), legend.title = element_text(size=12),
             legend.position = "bottom",
