@@ -7,12 +7,12 @@ library(ggplot2)
 #  Main Parameters
 
 # list of directories of the results
-# result file is saved at, e.g. parent_dir[i]/${prefix_dir}[i]_${ranks}[j]/output_lambda_*.RData
+# result file is saved at, e.g. parent_dir[i]/${prefix_dir}[i]${ranks}[j]/results_rank_${rank}[j]/output_lambda_*.RData
 # parent_dir[i] saves results of type fit_types[i] ("lazy"/"exact")
 parent_dir <- c("/scratch/users/junyangq/multiresponse/results_mr_lazy_1_rank_35/",
                 "/oak/stanford/groups/mrivas/users/mrivas/repos/multiresponse-ukbb/"
 )
-prefix_dir <- c("results_rank_", "results_biomarkers_unweighted/results_rank_")
+prefix_dir <- c("results_rank_", "results_biomarkers_unweightedresults_rank_")
 fit_types <- c("lazy", "exact")
 
 # directory of snpnet results (otherwise use NULL)
@@ -40,7 +40,7 @@ data_metric_full <- NULL
 
 for (dir_idx in 1:length(prefix_dir)) {
   for (rank in ranks) {
-    dir_rank <- file.path(parent_dir[dir_idx], paste0(prefix_dir[dir_idx], rank))
+    dir_rank <- file.path(parent_dir[dir_idx], paste0(prefix_dir[dir_idx], rank), paste0("results_rank_", rank))
     files_in_dir <- list.files(dir_rank)
     result_files <- files_in_dir[startsWith(files_in_dir, prefix_result_file)]
     max_iter <- max(as.numeric(gsub(suffix_result_file, "", gsub(pattern = prefix_result_file, "", result_files))))
