@@ -70,7 +70,7 @@ alternate_Y_glmnet <- function(features, response, missing_response, lambda, pen
   }
   cat("    Finish Y-C (glmnet) iteration:", message, "in", niter, "iterations.\n")
   colnames(CC) <- colnames(response)
-  W <- CC[1:num_covariates, , drop = F]
+  W <- CC[seq_len(num_covariates), , drop = F]
   C <- CC[(num_covariates+1):ncol(features), , drop = F]
   if (r < ncol(response)) {  ## but assumes that the number of selected variables is less than the target rank
     svd_obj <- svd(C)
