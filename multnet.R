@@ -267,6 +267,8 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
   W_full <- coef_Y_Z - tcrossprod(coef_score_Z, A) ## can be different from W on exit of inner loop
   a0 <- W_full[1, ]
   W <- W_full[-1, , drop = F]
+
+  colnames(C) <- colnames(Y)
   
   # browser()
   out <- list(B = B, A = A, C = C, a0 = a0, W = W, obj_values = obj_values, message = message, 
