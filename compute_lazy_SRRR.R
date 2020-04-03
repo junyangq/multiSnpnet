@@ -179,6 +179,7 @@ for (j in 1:max_iter) {
         C_approx <- activeC
       } else {
         C_approx <- tcrossprod(svdC$u[, 1:r, drop = F] %*% diag(svdC$d[1:r], r), svdC$v[, 1:r, drop = F])
+        colnames(C_approx) <- colnames(activeC)
       }
       pred_cov_train <- if (!is.null(covariates_train)) covariates_train_matrix %*% as.matrix(e$fit$W) else 0
       pred_cov_val <- if (!is.null(covariates_val)) covariates_val_matrix %*% as.matrix(e$fit$W) else 0
