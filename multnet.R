@@ -504,6 +504,11 @@ computeProduct_P2 <- function(residual, pfile, vars, stats, configs, iter) {
 }
 ###### ------------------------------------------------------------------- ######
 
+# used to compute the new lambda.min.ratio if we want to extend the original lambda sequence
+compute_lambda_min_ratio <- function(nlambda = 100, ratio = 0.01, nlambda.new) {
+  exp((nlambda.new-1)/(nlambda-1)*log(ratio))
+}
+
 
 SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_names, results_dir, 
                       r, nlambda = 100, batch_size = 100, lambda.min.ratio = 0.01, 
