@@ -505,7 +505,7 @@ computeProduct_P2 <- function(residual, pfile, vars, stats, configs, iter) {
 ###### ------------------------------------------------------------------- ######
 
 # used to compute the new lambda.min.ratio if we want to extend the original lambda sequence
-compute_lambda_min_ratio <- function(nlambda = 100, ratio = 0.01, nlambda.new) {
+compute_lambda_min_ratio <- function(nlambda.new, nlambda = 100, ratio = 0.01) {
   exp((nlambda.new-1)/(nlambda-1)*log(ratio))
 }
 
