@@ -319,10 +319,13 @@ y_de_standardization <- function(response, means, sds, weight) {
   response
 }
 
-setup_configs_directories <- function(configs, covariates, save, results.dir, validation) {
+setup_configs_directories <- function(configs, covariates, save, results.dir, validation, nlambda, lambda.min.ratio, standardize_response) {
   if (configs[["use_plink2"]] && !("mem" %in% names(configs)))
     stop("mem should be provided to guide the memory capacity for PLINK2.")
   configs[["covariates"]] <- covariates
+  configs[["nlambda"]] <- nlambda
+  configs[["lambda.min.ratio"]] <- lambda.min.ratio
+  configs[["standardize_response"]] <- standardize_response
   configs[['gcount.basename.prefix']] <- "snpnet.train"
   default_settings <- list(missing.rate = 0.1, MAF.thresh = 0.001, nCores = 1,
                         nlams.init = 10, nlams.delta = 5,
@@ -510,7 +513,7 @@ SRRR_path <- function(genotype_file, phenotype_file, phenotype_names, covariate_
                       prev_iter = 0, weight = NULL, binary_phenotypes = NULL,
                       use_plink2 = FALSE, genotype_p2file, genotype_p2file_val = NULL) {
   
-  configs <- setup_configs_directories(configs, covariate_names, save, results_dir, validation)
+  configs <- setup_configs_directories(configs, covariate_names, save, results_dir, validation, nlambda, lambda.min.ratio, standardize_response)
   
   start_all <- Sys.time()
 
