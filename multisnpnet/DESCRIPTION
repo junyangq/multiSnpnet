@@ -9,10 +9,8 @@ Authors@R: c(
     person("Trevor", "Hastie", email = "hastie@stanford.edu", role = c("aut")),
     person("Yosuke", "Tanigawa", email = "ytanigaw@stanford.edu", role = c("ctb"))
     )
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: Fit a sparse reduced rank regression model on large-scale SNP data and multivariate 
-responses with batch variable screening and alternating minimization. It computes a full solution 
-path on a grid of penalty values. Can deal with larger-than-memory SNP data.
+Description: Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses with batch variable screening and alternating minimization. It computes a full solution path on a grid of penalty values. Can deal with larger-than-memory SNP data.
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
+RoxygenNote: 7.1.0

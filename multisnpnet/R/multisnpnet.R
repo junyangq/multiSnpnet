@@ -1,3 +1,12 @@
+#' Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses
+#'
+#' Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses
+#' with batch variable screening and alternating minimization. It computes a full solution path
+#' on a grid of penalty values. Can deal with larger-than-memory SNP data.
+#'
+#' @importFrom data.table ':='
+#'
+#' @export
 multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL,
                         covariate_names, rank, nlambda = 100, lambda.min.ratio = 0.01, standardize_response = TRUE,
                         weight = NULL, split_col = NULL, validation = FALSE, mem = NULL,
@@ -20,7 +29,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
 
   ctype <- c("FID" = "character", "IID" = "character")
   if (!is.null(split_col)) ctype[split_col] <- "character"
-  phe_master <- fread(phenotype_file, colClasses = ctype, select = c("FID", "IID", split_col, covariate_names, phenotype_names))
+  phe_master <- data.table::fread(phenotype_file, colClasses = ctype, select = c("FID", "IID", split_col, covariate_names, phenotype_names))
   phe_master[["ID"]] <- paste(phe_master[["FID"]], phe_master[["IID"]], sep = "_")
   fill_missing(phe_master, phenotype_names, -9, NA) # replace -9 with NA
 

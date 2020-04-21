@@ -16,7 +16,7 @@ setupMultiConfigs <- function(configs, standardize_response, max.iter, rank) {
   configs
 }
 
-
+#' @importFrom data.table set
 fill_missing <- function(data, colnames, key, values) {
   if (length(values) == 1) values <- rep(values, length(colnames))
   if (is.na(key)) {
@@ -102,7 +102,6 @@ alternate_Y_glmnet <- function(features, response, missing_response, lambda, pen
     rownames(A) <- colnames(C)
   }
   a0 <- fit$a0
-  # residuals <- response - predict(fit, newx = features_matrix)[, , 1]
   residuals <- response - pred
   out <- list(response = response, a0 = a0, W = W, C = C, CC = CC, B = B, A = A, residuals = residuals, obj_values = obj_values)
   out
@@ -201,7 +200,7 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
 
 
     if (k > 1) C_old <- C
-    C <- tcrossprod(B, A)
+    C <- tcrossprod(as.matrix(B), A)
 
     MAXLEN <- 2^31 - 1  # deal with long vector
     ncol.chunk <- floor(MAXLEN / as.double(nrow(X)) / 4)
@@ -290,13 +289,10 @@ y_de_standardization <- function(response, means, sds, weight) {
   response
 }
 
-
-###### From Yosuke's implementation using PLINK 2.0 for inner product ######
 timeDiff <- function(start.time, end.time = NULL) {
   if (is.null(end.time)) end.time <- Sys.time()
   paste(round(end.time-start.time, 4), units(end.time-start.time))
 }
-###### ------------------------------------------------------------------- ######
 
 # used to compute the new lambda.min.ratio if we want to extend the original lambda sequence
 compute_lambda_min_ratio <- function(nlambda.new, nlambda = 100, ratio = 0.01) {
