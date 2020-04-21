@@ -53,7 +53,6 @@ time_diff <- function(start_time, end_time) {
 alternate_Y_glmnet <- function(features, response, missing_response, lambda, penalty_factor, configs,
                                num_covariates, r, thresh = 1E-7, object0, W_init, B_init, A_init, glmnet_thresh = 1e-7,
                                max.iter) {
-  # browser()
   converge <- FALSE
   features_matrix <- as.matrix(features)
   niter <- 0
@@ -66,7 +65,6 @@ alternate_Y_glmnet <- function(features, response, missing_response, lambda, pen
   } else {
     CC <- matrix(0, ncol(features_matrix), ncol(response))
     rownames(CC) <- colnames(features_matrix)
-    # browser()
     CC[rownames(B_init), ] <- tcrossprod(as.matrix(B_init), A_init)
     CC[rownames(W_init), ] <- as.matrix(W_init)
   }
@@ -113,16 +111,12 @@ alternate_Y_glmnet <- function(features, response, missing_response, lambda, pen
 
 SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r, niter, B0, thresh = 1e-7, object0,
                                               is.warm.start = FALSE, is.A.converge = TRUE, glmnet_thresh = 1e-7) {
-  # browser()
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(Y)
 
-  # browser()
-  # B <- B0
   B <- matrix(0, ncol(X), r)
   rownames(B) <- colnames(X)
-  # browser()
   B[rownames(B0), ] <- as.matrix(B0)
 
   obj_values <- rep(NA, niter)
@@ -145,9 +139,9 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
     for (jc in 1:numChunks) {
       idx <- ((jc-1)*ncol.chunk+1):min(jc*ncol.chunk, ncol(X))
       if (jc == 1) {
-        score <- as.matrix(X[, idx] %*% B[idx, ])
+        score <- as.matrix(X[, idx] %*% B[idx, , drop = F])
       } else {
-        score <- score + as.matrix(X[, idx] %*% B[idx, ])
+        score <- score + as.matrix(X[, idx] %*% B[idx, , drop = F])
       }
     }
 
@@ -194,8 +188,12 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
     } else {
       mfit <- glmnetPlus::glmnet(x = X, y = YA, family = "mgaussian", standardize = F, intercept = F, lambda = lambda, beta0 = B, thresh = glmnet_thresh)
     }
+    if (is.null(dim(mfit$a0))) {
+      mfit$a0 <- matrix(mfit$a0, nrow = 1)
+      mfit$beta <- list(mfit$beta)
+    }
     beta_single <- coef(mfit, s = lambda, x = X, y = YA)
-    B <- do.call(cbind, beta_single)[-1, ]
+    B <- do.call(cbind, beta_single)[-1, , drop = F]
 
     end_B <- Sys.time()
     cat("    Finish solving for B. ", "Time elapsed: ",
@@ -212,9 +210,9 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
     for (jc in 1:numChunks) {
       idx <- ((jc-1)*ncol.chunk+1):min(jc*ncol.chunk, ncol(X))
       if (jc == 1) {
-        score <- as.matrix(X[, idx] %*% B[idx, ])
+        score <- as.matrix(X[, idx, drop = F] %*% B[idx, , drop = F])
       } else {
-        score <- score + as.matrix(X[, idx] %*% B[idx, ])
+        score <- score + as.matrix(X[, idx, drop = F] %*% B[idx, , drop = F])
       }
     }
 
