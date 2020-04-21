@@ -16,6 +16,7 @@ install_github("chrchang/plink-ng", subdir="/2.0/pgenlibr")
 We assume the users already have PLINK 2.0. Otherwise it can be installed from https://www.cog-genomics.org/plink/2.0/.
 
 ### Sample Usage:
+```r
 library(multisnpnet)
 
 genotype_file <- file.path(system.file("extdata", package = "multisnpnet"), "sample")
@@ -37,3 +38,4 @@ out <- multisnpnet(
   standardize_response = TRUE, 
   save = TRUE
 )
+```
