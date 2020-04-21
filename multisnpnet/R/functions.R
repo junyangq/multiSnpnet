@@ -131,42 +131,22 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
       }
     }
 
-    # crossmat <- crossprod(crossprod(X, Y), B)
-    # is_Y_converge <- FALSE
     impute_iter_count <- 0
-    # fit_score <-
     projected_score_Z <- Z %*% (PZ %*% score)
     RS <- score - projected_score_Z
-    # RS <- residuals(fit_score)
     cat("    Start Y-A iteration ...\n")
     B_norm <- sum(row_norm2(B))
     start_Y_A <- Sys.time()
     while (TRUE) {
       A_niter[k] <- A_niter[k] + 1
       impute_iter_count <- impute_iter_count + 1
-      # print(impute_iter_count)
-      # fit_Y <- lm(Y ~ Z)
-      # RY <- residuals(fit_Y)
       projected_Y_Z <- Z %*% (PZ %*% Y)
       RY <- Y - projected_Y_Z
       crossmat <- crossprod(RY, score)
       svd_cross <- svd(crossmat)
-      # if (impute_iter_count > 1) A_old <- A
       if (impute_iter_count > 1) obj_old <- obj
       A <- tcrossprod(svd_cross$u, svd_cross$v)
-      # Y_new <- tcrossprod(score, A)
-      # Y_new <- Y - predict(fit_Y, )
       Y_new <- projected_Y_Z + tcrossprod(RS, A)  # implicit W
-      # print(A[1, ])
-      # if (impute_iter_count > 1) {
-      #   delta <- mean((A - A_old)^2)  ## until A is stable
-      # } else {
-      #   delta <- 100
-      # }
-      # print(delta)
-      # delta <- mean((Y[Y_missing] - Y_new[Y_missing])^2)
-      # print(delta)
-      # browser()
       Y[Y_missing] <- Y_new[Y_missing]
 
       obj <- mean((Y - Y_new)^2)/2*ncol(Y) + lambda * B_norm
@@ -187,32 +167,12 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
 
     cat("    Start solving for B ...\n")
 
-    # browser()
-    # fix A, solve B
-    # fit_Y <- lm(Y ~ Z)
-    # coef_Y_Z <- PZ %*% Y
-    # projected_Y_Z <- Z %*% coef_Y_Z
-    # RY <- residuals(fit_Y)
-    # RY <- Y - projected_Y_Z  # more recent
-    # YA <- RY %*% A + projected_score_Z
-    # YA <- Y %*% A
     ZW <- Y_new - tcrossprod(score, A)
-    # YA <- tcrossprod(score, A)
-    # ZW <- projected_Y_Z - tcrossprod(projected_score_Z, A)
     YA <- (Y - ZW) %*% A
-
-    # YA <- Y %*% A
-    # keep a strong set, update only when KKT is violated ...
-    # if (!is.null(lambda_seq)) {
-    #   lambda_seq <- sort(unique(c(lambda_seq, lambda)), decreasing = T)
-    #   lambda_seq <- lambda_seq[lambda_seq >= lambda]
-    # }
     if (k == 1 && !is.warm.start) {
       mfit <- glmnetPlus::glmnet(x = X, y = YA, family = "mgaussian", standardize = F, intercept = F, lambda = lambda, thresh = glmnet_thresh)
-      # print(mfit$npasses)
     } else {
       mfit <- glmnetPlus::glmnet(x = X, y = YA, family = "mgaussian", standardize = F, intercept = F, lambda = lambda, beta0 = B, thresh = glmnet_thresh)
-      # print(mfit$npasses)
     }
     beta_single <- coef(mfit, s = lambda, x = X, y = YA)
     B <- do.call(cbind, beta_single)[-1, ]
@@ -238,19 +198,13 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
       }
     }
 
-    # score <- X %*% B
-
     Y_new <- ZW + tcrossprod(score, A)
     Y[Y_missing] <- Y_new[Y_missing]
     residuals <- Y - Y_new
-    # obj_values[k] <- 1/(2*n) * sum((residuals[!Y_missing])^2) +
-    #   lambda * sum(apply(B, 1, function(x) sqrt(sum(x^2))))
     obj_values[k] <- 1/(2*n) * sum((residuals)^2) +
       lambda * sum(row_norm2(B))
 
-    # if (k > 1) print(abs(obj_values[k] - obj_values[k-1])/object0)
     if (k > 1 && abs(obj_values[k] - obj_values[k-1]) < thresh*object0) {
-      # if (k > 1 && mean((C - C_old)^2) < thresh) {  ## until C is stable
       message <- "Converged"
       obj_values <- obj_values[1:k]
       A_niter <- A_niter[1:k]
@@ -270,7 +224,6 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
 
   colnames(C) <- colnames(Y)
 
-  # browser()
   out <- list(B = B, A = A, C = C, a0 = a0, W = W, obj_values = obj_values, message = message,
               niter = count, response = Y, A_niter = A_niter, residuals = residuals)
   out
@@ -319,154 +272,11 @@ y_de_standardization <- function(response, means, sds, weight) {
   response
 }
 
-setup_configs_directories <- function(configs, covariates, save, results.dir, validation, nlambda, lambda.min.ratio, standardize_response) {
-  if (configs[["use_plink2"]] && !("mem" %in% names(configs)))
-    stop("mem should be provided to guide the memory capacity for PLINK2.")
-  configs[["covariates"]] <- covariates
-  configs[["nlambda"]] <- nlambda
-  configs[["lambda.min.ratio"]] <- lambda.min.ratio
-  configs[["standardize_response"]] <- standardize_response
-  configs[['gcount.basename.prefix']] <- "snpnet.train"
-  default_settings <- list(missing.rate = 0.1, MAF.thresh = 0.001, nCores = 1,
-                           nlams.init = 10, nlams.delta = 5,
-                           gcount.full.prefix = NULL, vzs = TRUE)
-  for (name in names(default_settings)) {
-    if (!(name %in% names(configs))) configs[[name]] <- default_settings[[name]]
-  }
-
-  if (!("bufferSize" %in% names(configs)))
-    stop("bufferSize should be provided to guide the memory capacity.")
-  if (!("chunkSize" %in% names(configs)))
-    configs[["chunkSize"]] <- configs[["bufferSize"]] / configs[["nCores"]]
-  if (save) {
-    if (is.null(configs[["meta.dir"]])) configs[["meta.dir"]] <- "meta/"
-    if (is.null(configs[["results.dir"]])) configs[["results.dir"]] <- "results/"
-    dir.create(file.path(results.dir, configs[["meta.dir"]]), showWarnings = FALSE, recursive = T)
-    dir.create(file.path(results.dir, configs[["results.dir"]], "train"), showWarnings = FALSE, recursive = T)
-    if (validation) dir.create(file.path(results.dir, configs[["results.dir"]], "val"), showWarnings = FALSE, recursive = T)
-  }
-  configs[["gcount.full.prefix"]] <- file.path(configs[['results.dir']], configs[['meta.dir']], configs[['gcount.basename.prefix']])
-  configs[["zstdcat.path"]] <- 'zstdcat'
-  configs[["save.computeProduct"]] <- FALSE
-  configs[["parent.dir"]] <- results.dir
-  configs[["endian"]] <- "little"
-  configs[["save"]] <- save
-  configs
-}
 
 ###### From Yosuke's implementation using PLINK 2.0 for inner product ######
 timeDiff <- function(start.time, end.time = NULL) {
   if (is.null(end.time)) end.time <- Sys.time()
   paste(round(end.time-start.time, 4), units(end.time-start.time))
-}
-
-computeStats_P2 <- function(pfile, ids, configs) {
-  time.computeStats.start <- Sys.time()
-  snpnetLogger('Start computeStats()', indent=2, log.time=time.computeStats.start)
-  keep_f       <- paste0(configs[['gcount.full.prefix']], '.keep')
-  gcount_tsv_f <- paste0(configs[['gcount.full.prefix']], '.gcount.tsv')
-
-  dir.create(dirname(configs[['gcount.full.prefix']]), showWarnings = FALSE, recursive = TRUE)
-  if (file.exists(gcount_tsv_f)) {
-    gcount_df <- fread(gcount_tsv_f)
-  } else {
-    # To run plink2 --geno-counts, we write the list of IDs to a file
-    data.frame(ID = ids) %>%
-      separate(ID, into=c('FID', 'IID'), sep='_') %>%
-      fwrite(keep_f, sep='\t', col.names=F)
-
-    # Run plink2 --geno-counts
-    system(paste(
-      'plink2',
-      '--threads', configs[['nCores']],
-      '--memory', configs[['mem']],
-      '--pfile', pfile, ifelse(configs[['vzs']], 'vzs', ''),
-      '--keep', keep_f,
-      '--out', configs[['gcount.full.prefix']],
-      '--geno-counts cols=chrom,pos,ref,alt,homref,refalt,altxy,hapref,hapalt,missing,nobs',
-      sep=' '
-    ), intern=F, wait=T)
-
-    # read the gcount file
-    gcount_df <-
-      data.table::fread(paste0(configs[['gcount.full.prefix']], '.gcount')) %>%
-      rename(original_ID = ID) %>%
-      mutate(
-        ID = paste0(original_ID, '_', ALT),
-        stats_pNAs  = MISSING_CT / (MISSING_CT + OBS_CT),
-        stats_means = (HAP_ALT_CTS + HET_REF_ALT_CTS + 2 * TWO_ALT_GENO_CTS ) / OBS_CT,
-        stats_msts  = (HAP_ALT_CTS + HET_REF_ALT_CTS + 4 * TWO_ALT_GENO_CTS ) / OBS_CT,
-        stats_SDs   = stats_msts - stats_means * stats_means
-      )
-  }
-
-  out <- list()
-  out[["pnas"]]  <- gcount_df %>% select(stats_pNAs) %>% pull()
-  out[["means"]] <- gcount_df %>% select(stats_means) %>% pull()
-  out[["sds"]]   <- gcount_df %>% select(stats_SDs) %>% pull()
-
-  for(key in names(out)){
-    names(out[[key]]) <- gcount_df %>% select(ID) %>% pull()
-  }
-  out[["excludeSNP"]] <- names(out[["means"]])[(out[["pnas"]] > configs[["missing.rate"]]) | (out[["means"]] < 2 * configs[["MAF.thresh"]])]
-
-  if (configs[['save']]){
-    gcount_df %>% fwrite(gcount_tsv_f, sep='\t')
-    saveRDS(out[["excludeSNP"]], file = file.path(dirname(configs[['gcount.full.prefix']]), "excludeSNP.rda"))
-  }
-  snpnetLoggerTimeDiff('End computeStats().', time.computeStats.start, indent=3)
-  out
-}
-
-computeProduct_P2 <- function(residual, pfile, vars, stats, configs, iter) {
-  time.computeProduct.start <- Sys.time()
-  snpnetLogger('Start computeProduct()', indent=2, log.time=time.computeProduct.start)
-
-  gc_res <- gc()
-  if(configs[['KKT.verbose']]) print(gc_res)
-
-  snpnetLogger('Start plink2 --variant-score', indent=3, log.time=time.computeProduct.start)
-  dir.create(file.path(configs[['parent.dir']], configs[["results.dir"]]), showWarnings = FALSE, recursive = T)
-
-  residual_f <- file.path(configs[["parent.dir"]], configs[["results.dir"]], paste0("residuals_iter_", iter, ".tsv"))
-
-  # write residuals to a file
-  residual_df <- data.frame(residual)
-  # colnames(residual_df) <- paste0('lambda_idx_', colnames(residual))
-  residual_df %>%
-    rownames_to_column("ID") %>%
-    separate(ID, into=c('#FID', 'IID'), sep='_') %>%
-    fwrite(residual_f, sep='\t', col.names=T)
-
-  # Run plink2 --geno-counts
-  system(paste(
-    'plink2',
-    '--threads', configs[['nCores']],
-    '--memory', as.integer(configs[['mem']]) - ceiling(sum(as.matrix(gc_res)[,2])),
-    '--pfile', pfile, ifelse(configs[['vzs']], 'vzs', ''),
-    '--read-freq', paste0(configs[['gcount.full.prefix']], '.gcount'),
-    '--keep', residual_f,
-    '--out', str_replace_all(residual_f, '.tsv$', ''),
-    '--variant-score', residual_f, 'zs', 'bin',
-    sep=' '
-  ), intern=F, wait=T)
-
-  prod.full <- readBinMat(str_replace_all(residual_f, '.tsv$', '.vscore'), configs)
-  if (! configs[['save']]) system(paste(
-    'rm', residual_f, str_replace_all(residual_f, '.tsv$', '.log'), sep=' '
-  ), intern=F, wait=T)
-
-  snpnetLoggerTimeDiff('End plink2 --variant-score.', time.computeProduct.start, indent=4)
-
-  rownames(prod.full) <- vars
-  if (configs[["standardize.variant"]]) {
-    for(residual.col in 1:ncol(residual)){
-      prod.full[, residual.col] <- apply(prod.full[, residual.col], 2, "/", stats[["sds"]])
-    }
-  }
-  prod.full[stats[["excludeSNP"]], ] <- NA
-  snpnetLoggerTimeDiff('End computeProduct().', time.computeProduct.start, indent=2)
-  prod.full
 }
 ###### ------------------------------------------------------------------- ######
 
