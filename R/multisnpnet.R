@@ -1,18 +1,57 @@
-#' Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses
+#' Fast Multi-Phenotype SRRR on SNP Data
 #'
 #' Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses
-#' with batch variable screening and alternating minimization. It computes a full solution path
-#' on a grid of penalty values. Can deal with larger-than-memory SNP data.
+#' with batch variable screening and alternating minimization. It computes a full solution path on a
+#' grid of penalty values. Can deal with larger-than-memory SNP data, missing values and adjustment
+#' covariates.
+#'
+#' @usage multisnpnet(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL,
+#'   covariate_names, rank, nlambda = 100, lambda.min.ratio = 0.01, standardize_response = TRUE,
+#'   weight = NULL, validation = FALSE, split_col = NULL, mem = NULL,
+#'   batch_size = 100, prev_iter = 0, max.iter = 10, configs = NULL, save = TRUE,
+#'   early_stopping = FALSE)
+#'
+#' @param genotype_file Path to the suite of genotype files. genotype_file.{pgen, psam, pvar.zst}
+#'   must exist.
+#' @param phenotype_file Path to the phenotype. The header must include FID, IID, covariate_names
+#'   and phenotype_names.
+#' @param binary_phenotypes Names of the binary phenotypes. AUC will be evaluated for binary
+#'   phenotypes.
+#' @param covariate_names Character vector of the names of the adjustment covariates.
+#' @param rank Target rank of the model.
+#' @param nlambda Number of penalty values.
+#' @param lambda.min.ratio Ratio of the minimum penalty to the maximum penalty.
+#' @param standardize_response Boolean. Whether to standardize the responses before fitting to deal
+#'   with potential different units of the responses.
+#' @param weight Numberic vector that specifies the (importance) weights for the responses.
+#' @param validation Boolean. Whether to evaluate on validation set.
+#' @param split_col Name of the column in the phenotype file that specifies whether each sample
+#'   belongs to the training split or the validation split. The values are either "train" or "val".
+#' @param mem Memory available for the program. It tells PLINK 2.0 the amount of memory it can
+#'   harness for the computation. IMPORTANT if using a job scheduler.
+#' @param batch_size Number of variants used in batch screening.
+#' @param prev_iter Index of the iteration to start from (e.g. to resume a previously interrupted
+#'   computation).
+#' @param max.iter Maximum number of iterations allowed for alternating minimization.
+#' @param configs List of additional configuration parameters. It can include:
+#'                \describe{
+#'                \item{nCores}{number of cores for the PLINK computation (default: 1)}
+#'                \item{thresh}{convergence threshold for alternating minimization (default: 1E-7)}
+#'                \item{glmnet.thresh}{convergence threshold for glmnet(Plus) (default: 1E-7)}
+#'                \item{plink2.path}{path to the PLINK2.0 program, if not on the system path}
+#'                \item{zstdcat.path}{path to the zstdcat program, if not on the system path}
+#'                }
+#' @param save Boolean. Whether to save intermediate results.
+#' @param early_stopping. Whether to stop the process early if validation metric starts to fall.
 #'
 #' @importFrom data.table ':='
 #'
 #' @export
 multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL,
                         covariate_names, rank, nlambda = 100, lambda.min.ratio = 0.01, standardize_response = TRUE,
-                        weight = NULL, split_col = NULL, validation = FALSE, mem = NULL,
+                        weight = NULL, validation = FALSE, split_col = NULL, mem = NULL,
                         batch_size = 100, prev_iter = 0, max.iter = 10, configs = NULL, save = TRUE,
-                        early_stopping = FALSE
-                        ) {
+                        early_stopping = FALSE) {
 
   configs <- snpnet:::setupConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names, "gaussian", 1.0, nlambda, mem)
   configs <- setupMultiConfigs(configs, standardize_response, max.iter, rank)
