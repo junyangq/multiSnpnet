@@ -1,17 +1,16 @@
-multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariate_names, results_dir,
-                      r, nlambda = 100, batch_size = 100, lambda.min.ratio = 0.01, split_col = NULL,
-                      max.iter = 10, is.warm.start = TRUE, is.A.converge = TRUE, thresh = 1e-7, glmnet_thresh = 1e-7,
-                      standardize_response = TRUE, mem = NULL,
-                      configs, save = TRUE, validation = FALSE, early_stopping = FALSE,
-                      prev_iter = 0, weight = NULL, binary_phenotypes = NULL
-                      ) {
+multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL,
+                        covariate_names, rank, nlambda = 100, lambda.min.ratio = 0.01, standardize_response = TRUE,
+                        weight = NULL, split_col = NULL, validation = FALSE, mem = NULL,
+                        batch_size = 100, prev_iter = 0, max.iter = 10, configs = NULL, save = TRUE,
+                        early_stopping = FALSE
+                        ) {
 
   configs <- snpnet:::setupConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names, "gaussian", 1.0, nlambda, mem)
-  configs[["standardize_response"]] <- standardize_response
+  configs <- setupMultiConfigs(configs, standardize_response, max.iter, rank)
 
   start_all <- Sys.time()
 
-  if (r > length(phenotype_names)) stop("The specified rank (", r, ") should not be greater than the number of responses (", length(phenotype_names), ").")
+  if (rank > length(phenotype_names)) stop("The specified rank (", rank, ") should not be greater than the number of responses (", length(phenotype_names), ").")
 
   cat("Start Sparse Reduced Rank Regression for ", paste(phenotype_names, collapse = ", "), ".\n", sep = "")
 
@@ -79,13 +78,12 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
   var_train <- apply(response_train_0, 2, function(x) mean((x - mean(x, na.rm = T))^2, na.rm = T))
 
   if (save) {
-    dir.create(file.path(results_dir, configs[["meta.dir"]]), recursive = TRUE)
-    dir.create(file.path(results_dir, configs[["results.dir"]]), recursive = TRUE)
-    dir.create(file.path(results_dir, configs[["results.dir"]], "train"), recursive = TRUE)
-    dir.create(file.path(results_dir, configs[["results.dir"]], "val"), recursive = TRUE)
+    dir.create(file.path(configs[["results.dir"]], configs[["meta.dir"]]), recursive = TRUE, showWarnings = FALSE)
+    dir.create(file.path(configs[["results.dir"]], "train"), showWarnings = FALSE)
+    dir.create(file.path(configs[["results.dir"]], "val"), showWarnings = FALSE)
 
-    saveRDS(phe_train, file = file.path(results_dir, configs[["meta.dir"]], "phe_train.rds"))
-    if (validation) saveRDS(phe_val, file = file.path(results_dir, configs[["meta.dir"]], "phe_val.rds"))
+    saveRDS(phe_train, file = file.path(configs[["results.dir"]], configs[["meta.dir"]], "phe_train.rds"))
+    if (validation) saveRDS(phe_val, file = file.path(configs[["results.dir"]], configs[["meta.dir"]], "phe_val.rds"))
   }
 
   if (is.null(weight)) {
@@ -159,7 +157,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
   colnames(AUC_train) <- colnames(AUC_val) <- binary_phenotypes
   nactive <- rep(NA, 100)
 
-  if (r == ncol(response_train) && !is.null(covariates_train)) {
+  if (rank == ncol(response_train) && !is.null(covariates_train)) {
     features_train <- covariates_train
     if (validation) features_val <- covariates_val
   }
@@ -167,7 +165,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
   if (prev_iter < 0) {
     prev_iter <- 0
     for (idx in 1:nlambda) {
-      fname <- file.path(results_dir, configs[["results.dir"]], paste0("output_lambda_", idx, ".RData"))
+      fname <- file.path(configs[["results.dir"]], paste0("output_lambda_", idx, ".RData"))
       if (file.exists(fname)) {
         prev_iter <- idx
       } else {
@@ -179,10 +177,10 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
   if (prev_iter != 0) {
     cat("Recover iteration ", prev_iter, ". Now time: ", as.character(Sys.time()), "\n", sep = "")
     load_start <- Sys.time()
-    load(file.path(results_dir, configs[["results.dir"]], paste0("output_lambda_", prev_iter, ".RData")))
+    load(file.path(configs[["results.dir"]], paste0("output_lambda_", prev_iter, ".RData")))
     response_train <- fit$response
     start_lambda <- ilam + 1
-    if (r == ncol(response_train) && !is.null(covariates_train)) {
+    if (rank == ncol(response_train) && !is.null(covariates_train)) {
       features_train[, (feature_names) := snpnet:::prepareFeatures(chr_train, vars, feature_names, stats)]
       if (validation) features_val[, (feature_names) := snpnet:::prepareFeatures(chr_val, vars, feature_names, stats)]
     } else {
@@ -238,8 +236,8 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
         features_train <- snpnet:::prepareFeatures(chr_train, vars, feature_names_add, stats)
         if (validation) features_val <- snpnet:::prepareFeatures(chr_val, vars, feature_names_add, stats)
       }
-      if (r == ncol(response_train) || ilam < 3) {
-        if (r == ncol(response_train)) {
+      if (rank == ncol(response_train) || ilam < 3) {
+        if (rank == ncol(response_train)) {
           penalty_factor <- rep(1, ncol(features_train))
         } else {
           features_train_combined <- cbind(covariates_train, features_train)
@@ -247,24 +245,27 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
         }
         penalty_factor[seq_len(length(covariate_names))] <- 0
         lam_adjusted <- full_lams[ilam] * sum(penalty_factor) / length(penalty_factor)  # adjustment to counteract automatic normalization in glmnet
-        if (r == ncol(response_train)) {
+        if (rank == ncol(response_train)) {
           fit <- alternate_Y_glmnet(features_train, response_train, missing_response_train,
                                     lam_adjusted, penalty_factor, configs,
-                                    num_covariates = length(covariate_names), r = r, thresh = thresh, object0 = object0,
-                                    W_init = W_init, B_init = B_init, A_init = A_init, glmnet_thresh = glmnet_thresh)
+                                    num_covariates = length(covariate_names), r = rank, thresh = configs[["thresh"]], object0 = object0,
+                                    W_init = W_init, B_init = B_init, A_init = A_init, glmnet_thresh = configs[["glmnet.thresh"]],
+                                    max.iter = max.iter)
         } else {
           fit <- alternate_Y_glmnet(features_train_combined, response_train, missing_response_train,
                                     lam_adjusted, penalty_factor, configs,
-                                    num_covariates = length(covariate_names), r = r, thresh = thresh, object0 = object0,
-                                    W_init = W_init, B_init = B_init, A_init = A_init, glmnet_thresh = glmnet_thresh)
+                                    num_covariates = length(covariate_names), r = rank, thresh = configs[["thresh"]], object0 = object0,
+                                    W_init = W_init, B_init = B_init, A_init = A_init, glmnet_thresh = configs[["glmnet.thresh"]],
+                                    max.iter = max.iter)
         }
         W_init <- fit$W
         A_init <- fit$A
       } else {
         fit <- SRRR_iterative_missing_covariates(as.matrix(features_train), response_train,
                                                  missing_response_train, Z1, PZ, lam,
-                                                 r, max.iter, B_init,
-                                                 thresh, object0, glmnet_thresh = glmnet_thresh)
+                                                 rank, max.iter, B_init, configs[["thresh"]], object0,
+                                                 configs[["is.warm.start"]], configs[["is.A.converge"]],
+                                                 glmnet_thresh = configs[["glmnet.thresh"]])
       }
       response_train <- fit$response
       residuals <- as.matrix(fit$residuals)
@@ -296,10 +297,10 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
     cat("R2_train:\n")
     print(R2_train)
     metric_train[ilam, ] <- R2_train
-    saveRDS(pred_train, file = file.path(results_dir, configs[["results.dir"]], "train", paste0("pred_score_", ilam, ".rds")))
+    saveRDS(pred_train, file = file.path(configs[["results.dir"]], "train", paste0("pred_score_", ilam, ".rds")))
 
     if (validation) {
-      if (r == ncol(response_train)) {
+      if (rank == ncol(response_train)) {
         pred_val <- sweep(as.matrix(features_val) %*% fit$CC, 2, fit$a0, FUN = "+")
       } else {
         if (!is.null(covariates_val)) {
@@ -314,7 +315,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
       cat("R2_val:\n")
       print(R2_val)
       metric_val[ilam, ] <- R2_val
-      saveRDS(pred_val, file = file.path(results_dir, configs[["results.dir"]], "val", paste0("pred_score_", ilam, ".rds")))
+      saveRDS(pred_val, file = file.path(configs[["results.dir"]], "val", paste0("pred_score_", ilam, ".rds")))
     }
 
     if (length(binary_phenotypes) > 0) {
@@ -357,7 +358,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, covariat
       feature_names <- setdiff(colnames(features_train), covariate_names)
       save(fit, ilam, current_active, active, feature_names, norm_prod, B_init, W_init, A_init,
            metric_train, metric_val, AUC_train, AUC_val, nactive, weight, configs,
-           file = file.path(results_dir, configs[["results.dir"]], paste0("output_lambda_", ilam, ".RData")))
+           file = file.path(configs[["results.dir"]], paste0("output_lambda_", ilam, ".RData")))
     }
 
     if (early_stopping && ilam > 2 && all(metric_val[ilam, ] < metric_val[ilam-1, ]) &&

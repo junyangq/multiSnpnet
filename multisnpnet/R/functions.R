@@ -1,3 +1,22 @@
+setupMultiConfigs <- function(configs, standardize_response, max.iter, rank) {
+  defaults_multi <- list(
+    is.warm.start = TRUE,
+    is.A.converge = TRUE,
+    thresh = 1e-7
+  )
+  out.args <- as.list(environment())
+  for (name in setdiff(names(out.args), "configs")) {
+    configs[[name]] <- out.args[[name]]
+  }
+  for (name in names(defaults_multi)) {
+    if (!(name %in% names(configs))) {
+      configs[[name]] <- defaults_multi[[name]]
+    }
+  }
+  configs
+}
+
+
 fill_missing <- function(data, colnames, key, values) {
   if (length(values) == 1) values <- rep(values, length(colnames))
   if (is.na(key)) {
@@ -32,7 +51,8 @@ time_diff <- function(start_time, end_time) {
 
 
 alternate_Y_glmnet <- function(features, response, missing_response, lambda, penalty_factor, configs,
-                               num_covariates, r, thresh = 1E-7, object0, W_init, B_init, A_init, glmnet_thresh = 1e-7) {
+                               num_covariates, r, thresh = 1E-7, object0, W_init, B_init, A_init, glmnet_thresh = 1e-7,
+                               max.iter) {
   # browser()
   converge <- FALSE
   features_matrix <- as.matrix(features)
@@ -51,7 +71,7 @@ alternate_Y_glmnet <- function(features, response, missing_response, lambda, pen
     CC[rownames(W_init), ] <- as.matrix(W_init)
   }
 
-  while (!converge) {
+  while (!converge || niter > max.iter) {
     niter <- niter + 1
     fit <- glmnetPlus::glmnet(features_matrix, response, family = "mgaussian", lambda = lambda, penalty.factor = penalty_factor,
                               standardize = configs[["standardize.variant"]], standardize.response = FALSE, beta0 = CC, thresh = glmnet_thresh)
