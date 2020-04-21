@@ -3,7 +3,7 @@ Type: Package
 Title: Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses
 Version: 0.1.0
 Imports: snpnet, data.table, dplyr, pgenlibr
-Suggests: glmnet, glmnetPlus
+Suggests: glmnet, glmnetPlus, ROCR
 Authors@R: c(
     person("Junyang", "Qian", email = "junyangq@stanford.edu", role = c("aut", "cre")),
     person("Trevor", "Hastie", email = "hastie@stanford.edu", role = c("aut")),
