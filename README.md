@@ -16,6 +16,9 @@ install_github("chrchang/plink-ng", subdir="/2.0/pgenlibr")
 We assume the users already have PLINK 2.0. Otherwise it can be installed from https://www.cog-genomics.org/plink/2.0/.
 
 ### Sample Usage:
+
+For description of the arguments, see the function documentation (e.g. by `?multisnpnet`).
+
 ```r
 library(multisnpnet)
 
