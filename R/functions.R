@@ -298,3 +298,33 @@ timeDiff <- function(start.time, end.time = NULL) {
 compute_lambda_min_ratio <- function(nlambda.new, nlambda = 100, ratio = 0.01) {
   exp((nlambda.new-1)/(nlambda-1)*log(ratio))
 }
+
+#' Extract Coefficients from the Fitted Object or File
+#'
+#' @param fit Fit object returned from multisnpnet
+#' @param fit_path Path to the file that saves the fit object
+#' @param idx Lambda indices where the coefficients are requested
+#' @param uv Boolean. Whether U, V are used to represent the decomposed matrices or B, A.
+#'
+#' @return List of coefficients where each element is a list of one type of coefficients over the
+#'   provided lambda indices.
+#'
+#' @export
+coef.multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE) {
+  if (is.null(fit) && is.null(fit_path)) {
+    stop("Either fit object or file path to the saved object should be provided.\n")
+  }
+  if (is.null(fit)) fit <- readRDS(file = fit_path)
+  if (is.null(idx)) idx <- seq_along(fit)
+  fit <- fit[idx]
+  a0 <- lapply(fit, function(x) x$a0)
+  W <- lapply(fit, function(x) x$W)
+  B <- lapply(fit, function(x) x$B)
+  A <- lapply(fit, function(x) x$A)
+  if (uv) {
+    out <- list(a0 = a0, W = W, U = B, V = A, idx = idx)
+  } else {
+    out <- list(a0 = a0, W = W, B = B, A = A, idx = idx)
+  }
+  out
+}

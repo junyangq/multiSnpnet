@@ -407,6 +407,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       save(fit, ilam, current_active, active, feature_names, norm_prod, B_init, W_init, A_init,
            metric_train, metric_val, AUC_train, AUC_val, nactive, weight, configs,
            file = file.path(configs[["results.dir"]], paste0("output_lambda_", ilam, ".RData")))
+      saveRDS(fit_list, file = file.path(configs[["results.dir"]], "fit_list.rds"))
     }
 
     if (early_stopping && ilam > 2 && all(metric_val[ilam, ] < metric_val[ilam-1, ]) &&
@@ -416,6 +417,6 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     }
 
   }
-  out <- list(fit = fit_list)
-  out
+  class(fit_list) <- "multisnpnet"
+  fit_list
 }
