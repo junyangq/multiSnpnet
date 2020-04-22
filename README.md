@@ -25,8 +25,8 @@ library(multisnpnet)
 genotype_file <- file.path(system.file("extdata", package = "multisnpnet"), "sample")
 phenotype_file <- system.file("extdata", "sample.phe", package = "multisnpnet")
 
-phenotype_names = c("QPHE", "BPHE")
-covariate_names = c("age", "sex", paste0("PC", 1:10))
+phenotype_names <- c("QPHE", "BPHE")
+covariate_names <- c("age", "sex", paste0("PC", 1:10))
 
 out <- multisnpnet(
   genotype_file = genotype_file, 
