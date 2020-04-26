@@ -45,6 +45,7 @@
 #' @param early_stopping. Whether to stop the process early if validation metric starts to fall.
 #'
 #' @importFrom data.table ':='
+#' @importFrom magrittr '%>%'
 #'
 #' @export
 multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL,
@@ -70,6 +71,10 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   if (!is.null(split_col)) ctype[split_col] <- "character"
   phe_master <- data.table::fread(phenotype_file, colClasses = ctype, select = c("FID", "IID", split_col, covariate_names, phenotype_names))
   phe_master[["ID"]] <- paste(phe_master[["FID"]], phe_master[["IID"]], sep = "_")
+  phe_master <- phe_master %>%
+    dplyr::left_join(data.frame(ID = ids[["psam"]], sort_order = seq_along(ids[["psam"]]), stringsAsFactors = FALSE), by = "ID") %>%
+    dplyr::arrange(sort_order) %>% dplyr::select(-sort_order) %>%
+    data.table::as.data.table()
   fill_missing(phe_master, phenotype_names, -9, NA) # replace -9 with NA
 
   if (is.null(split_col)) {
