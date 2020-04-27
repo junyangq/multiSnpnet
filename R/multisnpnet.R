@@ -230,7 +230,10 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   if (prev_iter != 0) {
     cat("Recover iteration ", prev_iter, ". Now time: ", as.character(Sys.time()), "\n", sep = "")
     load_start <- Sys.time()
+    new_configs <- configs
     load(file.path(configs[["results.dir"]], paste0("output_lambda_", prev_iter, ".RData")))
+    check_configs_diff(configs, new_configs)
+    configs <- new_configs
     response_train <- fit$response
     start_lambda <- ilam + 1
     if (rank == ncol(response_train) && !is.null(covariates_train)) {
@@ -255,8 +258,6 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   } else {
     start_lambda <- 1
   }
-  # browser()
-
 
   for (ilam in start_lambda:nlambda) {  # consider batch-type algorithm later
     cat("Current lambda:", ilam, "\n")

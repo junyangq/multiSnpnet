@@ -169,7 +169,6 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
       } else {
         delta <- 100
       }
-
       if (delta < thresh*object0 || (!is.A.converge && A_niter[k] > 0)) {
         break
       }
@@ -297,6 +296,37 @@ timeDiff <- function(start.time, end.time = NULL) {
 # used to compute the new lambda.min.ratio if we want to extend the original lambda sequence
 compute_lambda_min_ratio <- function(nlambda.new, nlambda = 100, ratio = 0.01) {
   exp((nlambda.new-1)/(nlambda-1)*log(ratio))
+}
+
+check_configs_diff <- function(old_configs, new_configs) {
+  msg <- ""
+  for (name in intersect(names(old_configs), names(new_configs))) {
+    if (!identical(old_configs[[name]], new_configs[[name]])) {
+      msg <- paste0(
+        msg,
+        cat("Changed config for ", name, ": ", old_configs[[name]], " -> ", new_configs[[name]], "\n", sep = "")
+        )
+    }
+  }
+  for (name in setdiff(names(old_configs), names(new_configs))) {
+    if (!identical(old_configs[[name]], new_configs[[name]])) {
+      msg <- paste0(
+        msg,
+        cat("Deleted config for ", name, ": ", old_configs[[name]], "\n", sep = "")
+      )
+    }
+  }
+  for (name in setdiff(names(new_configs), names(old_configs))) {
+    if (!identical(old_configs[[name]], new_configs[[name]])) {
+      msg <- paste0(
+        msg,
+        cat("Added config for ", name, ": ", new_configs[[name]], "\n", sep = "")
+      )
+    }
+  }
+  if (msg != "") {
+    warning(msg)
+  }
 }
 
 #' Extract Coefficients from the Fitted Object or File
