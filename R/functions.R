@@ -1,10 +1,10 @@
 setupMultiConfigs <- function(configs, standardize_response, max.iter, rank) {
+  out.args <- as.list(environment())
   defaults_multi <- list(
     is.warm.start = TRUE,
     is.A.converge = TRUE,
     thresh = 1e-7
   )
-  out.args <- as.list(environment())
   for (name in setdiff(names(out.args), "configs")) {
     configs[[name]] <- out.args[[name]]
   }
