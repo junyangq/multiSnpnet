@@ -1,6 +1,6 @@
-# Fast Multi-Phenotype SRRR on SNP Data
+# Fast Multi-Phenotype SRRR on Genetic Data
 
-Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses with batch variable screening and alternating minimization. It computes a full solution path on a grid of penalty values. Can deal with larger-than-memory SNP data, missing values, and confounding covariates.
+Fit a sparse reduced rank regression model on large-scale genetic data and multivariate responses with batch variable screening and alternating minimization. It computes a full solution path on a grid of penalty values. Can deal with larger-than-memory SNP data, missing values, and confounding covariates.
 
 License: GPL-2
 
