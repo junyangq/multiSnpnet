@@ -74,7 +74,7 @@ alternate_Y_glmnet <- function(features, response, missing_response, lambda, pen
     fit <- glmnetPlus::glmnet(features_matrix, response, family = "mgaussian", lambda = lambda, penalty.factor = penalty_factor,
                               standardize = configs[["standardize.variant"]], standardize.response = FALSE, beta0 = CC, thresh = glmnet_thresh)
     CC <- do.call(cbind, fit$beta)
-    pred <- predict(fit, newx = features_matrix, type = "response")[, , 1]
+    pred <- glmnetPlus::predict(fit, newx = features_matrix, type = "response")[, , 1]
     response[missing_response] <- pred[missing_response]
     obj_values[niter] <- sum((response-pred)^2) / 2 / nrow(response) + lambda * sum(apply(CC, 1, function(x) sqrt(sum(x^2))))
     cat("         Objective (", niter, "): ", round(obj_values[niter], digits = 8), "\n", sep = "")
