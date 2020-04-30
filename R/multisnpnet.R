@@ -192,6 +192,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
 
   ## compute lambda sequence ##
   full_lams <- snpnet:::computeLambdas(score, nlambda, lambda.min.ratio)
+  configs[["lambda"]] <- full_lams
 
   ### --- Start fitting --- ###
   fit_list <- vector("list", nlambda)
