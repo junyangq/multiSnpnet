@@ -49,7 +49,7 @@
 #'
 #' @export
 multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL,
-                        covariate_names, rank, nlambda = 100, lambda.min.ratio = 0.01, standardize_response = TRUE,
+                        covariate_names, rank, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), standardize_response = TRUE,
                         weight = NULL, validation = FALSE, split_col = NULL, mem = NULL,
                         batch_size = 100, prev_iter = 0, max.iter = 10, configs = NULL, save = TRUE,
                         early_stopping = FALSE) {
@@ -70,6 +70,11 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   ctype <- c("FID" = "character", "IID" = "character")
   if (!is.null(split_col)) ctype[split_col] <- "character"
   phe_master <- data.table::fread(phenotype_file, colClasses = ctype, select = c("FID", "IID", split_col, covariate_names, phenotype_names))
+  if (length(covariate_names) > 0) {  # remove individuals with missing covariate values
+    cov_master <- as.matrix(phe_master[, covariate_names, with = F])
+    cov_no_missing <- apply(cov_master, 1, function(x) all(!is.na(x)))
+    phe_master <- phe_master[cov_no_missing, ]
+  }
   phe_master[["ID"]] <- paste(phe_master[["FID"]], phe_master[["IID"]], sep = "_")
   phe_master <- phe_master %>%
     dplyr::left_join(data.frame(ID = ids[["psam"]], sort_order = seq_along(ids[["psam"]]), stringsAsFactors = FALSE), by = "ID") %>%
@@ -181,13 +186,11 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   prod_full <- snpnet:::computeProduct(fit_init$residual, genotype_file, vars, stats, configs, iter=0) / length(rowIdx_subset_gen)
   # }
   score <- row_norm2(prod_full)
-  if (is.null(lambda.min.ratio)) {
-    lambda.min.ratio <- ifelse(n_subset_train < ncol(chr_train)-length(stats[["excludeSNP"]]), 0.01, 0.0001)
-  }
+  nobs <- n_subset_train
+  nvars <- length(vars)-length(stats[["excludeSNP"]])
+  configs[["lambda.min.ratio"]] <- lambda.min.ratio
 
   ## compute lambda sequence ##
-  configs[["lambda.min.ratio"]] <- lambda.min.ratio
-  configs[["nlambda"]] <- nlambda
   full_lams <- snpnet:::computeLambdas(score, nlambda, lambda.min.ratio)
 
   ### --- Start fitting --- ###
