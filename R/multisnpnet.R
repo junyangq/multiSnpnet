@@ -55,7 +55,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
                         early_stopping = FALSE) {
 
   configs <- snpnet:::setupConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names, "gaussian", 1.0, nlambda, mem)
-  configs <- setupMultiConfigs(configs, standardize_response, max.iter, rank)
+  configs <- setupMultiConfigs(configs, standardize_response, max.iter, rank, prev_iter, batch_size)
 
   start_all <- Sys.time()
 
@@ -153,6 +153,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     }
     weight <- weight / sum(weight) * length(phenotype_names)
   }
+  configs[["weight"]] <- weight
 
   if (standardize_response) {
     std_obj <- y_standardization(phe_train, phenotype_names, weight)
@@ -225,8 +226,6 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       fname <- file.path(configs[["results.dir"]], paste0("output_lambda_", idx, ".RData"))
       if (file.exists(fname)) {
         prev_iter <- idx
-      } else {
-        break
       }
     }
   }

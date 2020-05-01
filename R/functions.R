@@ -1,4 +1,4 @@
-setupMultiConfigs <- function(configs, standardize_response, max.iter, rank) {
+setupMultiConfigs <- function(configs, standardize_response, max.iter, rank, prev_iter, batch_size) {
   out.args <- as.list(environment())
   defaults_multi <- list(
     is.warm.start = TRUE,
@@ -357,4 +357,136 @@ coef.multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
     out <- list(a0 = a0, W = W, B = B, A = A, idx = idx)
   }
   out
+}
+
+#' Make plots of the multisnpnet results
+#'
+#' For 50th lambda, the reduced-rank results are saved at
+#' results_dir[i]/${rank_prefix}[i]${rank}[j]/${file_prefix}50${file_suffix}, and snpnet results are
+#' saved in ${snpnet_dir}/${phenotype}/${snpnet_subdir}/${snpnet_prefix}50${snpnet_suffix}
+#'
+#'
+#' @param results_dir Character vector each specifies the parent directory of one type (e.g. exact,
+#'   lazy) of results
+#' @param rank_prefix Character vector each specifies the prefix of the subdirectories holding
+#'   per-rank results separately
+#' @param type Character vector each specifies the type of the results, e.g., exact, lazy
+#' @param rank Numeric vector of ranks for which the results are available
+#' @param file_prefix Character vector each specifies the prefix of the result file
+#' @param file_suffix Character vector each specifies the suffix of the result file
+#' @param snpnet_dir Parent directory the snpnet results
+#' @param snpnet_subdir Name of the subdirectory hosting snpnet results. The result files are saved
+#'   in
+#' @param save_dir Directory to save the plots. If NULL, no plots are generated but the list of plot
+#'   objects is returned
+#' @param train_name Name of the object storing the training metric
+#' @param train_name Name of the object storing the validation metric
+#' @param xlim The x limits (x1, x2) of the plots
+#' @param ylim The y limits (y1, y2) of the plots
+#'
+#' @export
+plot.multisnpnet <- function(results_dir, rank_prefix, type, rank,
+                             file_prefix, file_suffix,
+                             snpnet_dir = NULL, snpnet_subdir = NULL, snpnet_prefix = NULL, snpnet_suffix = NULL,
+                             save_dir = NULL, train_name = "metric_train", val_name = "metric_val",
+                             xlim = c(0, NA), ylim = c(0, NA)) {
+  if (!is.null(save_dir)) dir.create(save_dir)
+  for (dir_idx in seq_along(results_dir)) {
+    for (r in rank) {
+      dir_rank <- file.path(results_dir[dir_idx], paste0(rank_prefix[dir_idx], r))
+      files_in_dir <- list.files(dir_rank)
+      result_files <- files_in_dir[startsWith(files_in_dir, file_prefix[dir_idx])]
+      max_iter <- max(as.numeric(gsub(file_suffix[dir_idx], "", gsub(pattern = file_prefix[dir_idx], "", result_files))))
+      latest_result <- file.path(dir_rank, paste0(file_prefix[dir_idx], max_iter, file_suffix[dir_idx]))
+
+      myenv <- new.env()
+      load(latest_result, envir = myenv)
+      metric_train <- myenv[[train_name]]
+      metric_val <- myenv[[val_name]]
+      imax_train <- max(which(apply(metric_train, 1, function(x) sum(is.na(x))) == 0))
+      imax_val <- max(which(apply(metric_val, 1, function(x) sum(is.na(x))) == 0))
+      imax <- min(imax_train, imax_val)
+      metric_train <- metric_train[1:imax, , drop = F]
+      metric_val <- metric_val[1:imax, , drop = F]
+      metric_train <- cbind(metric_train, lambda = 1:imax)
+      metric_val <- cbind(metric_val, lambda = 1:imax)
+
+      table_train <- melt(as.data.frame(metric_train), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_train")
+      table_val <- melt(as.data.frame(metric_val), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_val")
+      data_metric <- inner_join(table_train, table_val, by = c("phenotype", "lambda"))
+      data_metric[["type"]] <- fit_types[dir_idx]
+      data_metric[["rank"]] <- factor(r, levels = as.character(rank))
+
+      data_metric_full <- rbind(data_metric_full, data_metric)
+    }
+  }
+
+  if (!is.null(snpnet_dir)) {
+    for (phe in as.character(unique(data_metric[["phenotype"]]))) {
+      print(phe)
+      phe_dir <- file.path(snpnet_dir, phe, snpnet_subdir)  # results/results
+      files_in_dir <- list.files(phe_dir)
+      result_files <- files_in_dir[startsWith(files_in_dir, snpnet_prefix) & endsWith(files_in_dir, snpnet_suffix)]
+      max_iter <- max(as.numeric(gsub(suffix_result_file, "", gsub(pattern = snpnet_prefix, "", result_files))))
+      latest_result <- file.path(phe_dir, paste0(snpnet_prefix, max_iter, snpnet_suffix))
+
+      myenv <- new.env()
+      load(latest_result, envir = myenv)
+      metric_train <- myenv[["metric.train"]]
+      metric_val <- myenv[["metric.val"]]
+
+      imax_train <- max(which(!is.na(metric_train)))
+      imax_val <- max(which(!is.na(metric_val)))
+      imax <- min(imax_train, imax_val)
+
+      table_snpnet <- data.frame(lambda = 1:imax, phenotype = rep(phe, imax), metric_train = metric_train[1:imax],
+                                 metric_val = metric_val[1:imax], type = "exact", rank = "snpnet")
+
+      data_metric_full <- rbind(data_metric_full, table_snpnet)
+    }
+  }
+
+  gp <- list()
+
+  if (!is.null(snpnet_dir)) {
+    max_metric_reduced_rank <- data_metric_full %>%
+      dplyr::filter(rank != "snpnet") %>%
+      dplyr::group_by(phenotype) %>%
+      dplyr::summarise(max_multisnpnet_val = max(metric_val))
+    max_metric_snpnet <- data_metric_full %>%
+      dplyr::filter(rank == "snpnet") %>%
+      dplyr::group_by(phenotype) %>%
+      dplyr::summarise(max_snpnet_val = max(metric_val))
+    max_metric <- max_metric_reduced_rank %>%
+      dplyr::inner_join(max_metric_snpnet, by = "phenotype") %>%
+      dplyr::mutate(absolute_change = max_multisnpnet_val - max_snpnet_val,
+                    relative_change = max_multisnpnet_val/abs(max_snpnet_val)-1,
+                    direction = ifelse(relative_change > 0, "P", "N"))
+    gp[["r2_cmp_rel_change"]] <- ggplot(max_metric, aes(x = phenotype, y = pmin(relative_change*100, 100))) +
+      geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
+      geom_hline(yintercept = 0, colour = "grey90") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+      xlab("phenotypes") + ylab("R2 Relative Change (%)")
+    if (!is.null(save_dir)) {
+      save_path <- file.path(save_dir, "R2_cmp_rel_change.pdf")
+      ggsave(save_path, plot = gp[["r2_cmp_rel_change"]])
+    }
+  }
+
+  for (phe in as.character(unique(data_metric[["phenotype"]]))) {
+    gp[[phe]] <- ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
+      geom_path() + geom_point() +
+      xlab("metric (train)") + ylab("metric (val)") +
+      ylim(R2_lim) +
+      theme(axis.text=element_text(size=12), axis.title=element_text(size=12),
+            legend.text=element_text(size=12), legend.title = element_text(size=12),
+            legend.position = "bottom",
+            strip.text.x = element_text(size = 12), strip.text.y = element_text(size = 12)) +
+      ggtitle(phe)
+    if (!is.null(save_dir)) {
+      save_path <- file.path(save_dir, paste0("metric_plot_", phe, ".pdf"))
+      ggsave(save_path, plot = gp[[phe]])
+    }
+  }
+  gp
 }
