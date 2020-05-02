@@ -359,6 +359,125 @@ coef.multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
   out
 }
 
+#' Predict from the Fitted Object or File
+#'
+#' @param fit List of fit object returned from multisnpnet.
+#' @param saved_path Path to the file that saves the fit object. The full path is constructed as ${saved_path}${idx}.RData.
+#' @param new_genotype_file Path to the new suite of genotype files. genotype_file.{pgen, psam, pvar.zst}.
+#'   must exist.
+#' @param new_phenotype_file Path to the phenotype. The header must include FID, IID.
+#' @param idx Lambda indices where the coefficients are requested.
+#' @param covariate_names Character vector of the names of the adjustment covariates.
+#' @param split_col Name of the split column. If NULL, all samples will be used.
+#' @param split_name Label for the samples where prediction is to be made.
+#' @param zstdcat_path Path to zstdcat program, needed when loading variants
+#'
+#' @return A list containing the prediction and the resopnse for which the prediction is made.
+#'
+#' @export
+predict.multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new_phenotype_file,
+                                idx = NULL, covariate_names = NULL, split_col = NULL, split_name = "test",
+                                zstd_path = "zstdcat") {
+  if (is.null(fit) && is.null(saved_path)) {
+    stop("Either fit object or file path to the saved object should be provided.\n")
+  }
+  if (is.null(fit) && is.null(idx)) {
+    stop("Lambda indices on which prediction is made must be provided.\n")
+  }
+  if (is.null(fit)) {
+    # last <- max(idx)
+    # latest_result <- paste0(saved_path, last, ".RData")
+    # e <- new.env()
+    # load(latest_result, envir = e)
+    # feature_names <- e$active
+    #
+    fit <- vector("list", length(idx))
+    for (i in seq_along(idx)) {
+      e <- new.env()
+      load(paste0(saved_path, idx[i], ".RData"), envir = e)
+      fit[[i]] <- e$fit
+    }
+  }
+  stats <- fit[[length(fit)]][["stats"]]
+  std_obj <- fit[[length(fit)]][["std_obj"]]
+  weight <- fit[[length(fit)]][["weight"]]
+  phenotype_names <- colnames(fit[[length(fit)]][["C"]])
+  is_full_rank <- (ncol(fit[[length(fit)]][["B"]]) == ncol(fit[[length(fit)]][["C"]]))
+
+  covariate_names_fit <- rownames(fit[[length(fit)]][["W"]])
+  if (!setequal(covariate_names_fit, covariate_names)) {
+    stop("Unequal covariate sets in the fit and the argument.\n",
+         "Fit: ", covariate_names_fit, "\n",
+         "Argument: ", covariate_names, "\n")
+  }
+
+  ids <- list()
+  ids[["psam"]] <- snpnet:::readIDsFromPsam(paste0(new_genotype_file, '.psam'))
+
+  ctype <- c("FID" = "character", "IID" = "character")
+  if (!is.null(split_col)) ctype[split_col] <- "character"
+  phe_master <- data.table::fread(new_phenotype_file, colClasses = ctype, select = c("FID", "IID", split_col, covariate_names, phenotype_names))
+  if (length(covariate_names) > 0) {
+    cov_master <- as.matrix(phe_master[, covariate_names, with = F])
+    cov_no_missing <- apply(cov_master, 1, function(x) all(!is.na(x)))
+    phe_master <- phe_master[cov_no_missing, ]
+  }
+  phe_master[["ID"]] <- paste(phe_master[["FID"]], phe_master[["IID"]], sep = "_")
+  phe_master <- phe_master %>%
+    dplyr::inner_join(data.frame(ID = ids[["psam"]], sort_order = seq_along(ids[["psam"]]), stringsAsFactors = FALSE), by = "ID") %>%
+    dplyr::arrange(sort_order) %>% dplyr::select(-sort_order) %>%
+    data.table::as.data.table()
+
+  if (is.null(split_col)) {
+    ids[[split_name]] <- phe_master$ID
+  } else {
+    ids[[split_name]] <- phe_master$ID[phe_master[[split_col]] == split_name]
+  }
+
+  phe_test <- phe_master[match(ids[[split_name]], phe_master[["ID"]])]
+
+  if (length(covariate_names) > 0) {
+    covariates <- phe_test[, covariate_names, with = FALSE]
+  } else {
+    covariates <- NULL
+  }
+
+  vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0(zstdcat_path, ' ', paste0(new_genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
+  pvar <- pgenlibr::NewPvar(paste0(new_genotype_file, '.pvar.zst'))
+  chr <- pgenlibr::NewPgen(paste0(new_genotype_file, '.pgen'), pvar = pvar, sample_subset = match(ids[[split_name]], ids[["psam"]]))
+  pgenlibr::ClosePvar(pvar)
+
+  feature_names <- c()
+  for (i in seq_along(fit)) {
+    feature_names <- c(feature_names, rownames(fit[[i]]$B))
+  }
+  feature_names <- unique(feature_names)
+
+  if (!is.null(covariates) && is_full_rank) {
+    features <- data.table(covariates)
+    features[, (feature_names) := snpnet:::prepareFeatures(chr, vars, feature_names, stats)]
+  } else {
+    features <- snpnet:::prepareFeatures(chr, vars, feature_names, stats)
+  }
+
+  pred <- array(dim = c(nrow(features), length(fit[[length(fit)]][["a0"]]), length(fit)))
+
+  for (i in seq_along(fit)) {
+    if (!is.null(covariates) && !is_full_rank) {
+      features_single <- as.matrix(features[, rownames(fit[[i]]$C), with = F])
+      pred_single <- as.matrix(covariates) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C, 2, fit[[i]]$a0, FUN = "+")
+    } else {
+      features_single <- as.matrix(features[, rownames(fit[[i]]$CC), with = F])
+      pred_single <- sweep(features_single %*% fit[[i]]$CC, 2, fit[[i]]$a0, FUN = "+")
+    }
+    pred_single <- multisnpnet:::y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight)
+    pred[, , i] <- as.matrix(pred_single)
+  }
+
+  list(prediction = pred, response = as.matrix(phe_test[, phenotype_names, with = F]))
+}
+
+
 #' Make plots of the multisnpnet results
 #'
 #' For 50th lambda, the reduced-rank results are saved at

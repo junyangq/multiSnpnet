@@ -2,6 +2,7 @@
 
 S3method(coef,multisnpnet)
 S3method(plot,multisnpnet)
+S3method(predict,multisnpnet)
 export(multisnpnet)
 importFrom(data.table,':=')
 importFrom(data.table,set)

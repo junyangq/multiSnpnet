@@ -412,6 +412,9 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       }
     }
 
+    fit[["stats"]] <- stats
+    fit[["std_obj"]] <- std_obj
+    fit[["weight"]] <- weight
     fit_list[[ilam]] <- fit
     current_active <- which_row_active(fit$B)
     nactive[ilam] <- length(current_active)
