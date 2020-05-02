@@ -237,7 +237,6 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     load(file.path(configs[["results.dir"]], paste0("output_lambda_", prev_iter, ".RData")))
     check_configs_diff(configs, new_configs)
     configs <- new_configs
-    response_train <- fit$response
     start_lambda <- ilam + 1
     if (rank == ncol(response_train) && !is.null(covariates_train)) {
       features_train[, (feature_names) := snpnet:::prepareFeatures(chr_train, vars, feature_names, stats)]
@@ -248,6 +247,18 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
         features_val <- snpnet:::prepareFeatures(chr_val, vars, feature_names, stats)
       }
     }
+
+    if (rank == ncol(response_train)) {
+      pred_train_0 <- sweep(as.matrix(features_train) %*% fit$CC, 2, fit$a0, FUN = "+")
+    } else {
+      if (!is.null(covariates_val)) {
+        pred_train_0 <- sweep(as.matrix(covariates_train) %*% fit$W + as.matrix(features_train) %*% fit$C, 2, fit$a0, FUN = "+")
+      } else {
+        pred_train_0 <- sweep(as.matrix(features_train) %*% fit$C, 2, fit$a0, FUN = "+")
+      }
+    }
+    response_train[missing_response_train] <- pred_train_0[missing_response_train]
+
     prev_lambda <- nrow(metric_train)
     if (prev_lambda < nlambda) {
       metric_train <- rbind(metric_train, matrix(NA, nlambda-prev_lambda, q_train))
