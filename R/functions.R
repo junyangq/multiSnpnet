@@ -460,7 +460,8 @@ predict.multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
     features <- snpnet:::prepareFeatures(chr, vars, feature_names, stats)
   }
 
-  pred <- array(dim = c(nrow(features), length(fit[[length(fit)]][["a0"]]), length(fit)))
+  pred <- array(dim = c(nrow(features), length(fit[[length(fit)]][["a0"]]), length(fit)),
+                dimnames = list(ids[[split_name]], phenotype_names, seq_along(fit)))
 
   for (i in seq_along(fit)) {
     if (!is.null(covariates) && !is_full_rank) {
@@ -503,13 +504,16 @@ predict.multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
 #' @param xlim The x limits (x1, x2) of the plots
 #' @param ylim The y limits (y1, y2) of the plots
 #'
+#' @import ggplot2
+#'
 #' @export
 plot.multisnpnet <- function(results_dir, rank_prefix, type, rank,
                              file_prefix, file_suffix,
                              snpnet_dir = NULL, snpnet_subdir = NULL, snpnet_prefix = NULL, snpnet_suffix = NULL,
                              save_dir = NULL, train_name = "metric_train", val_name = "metric_val",
-                             xlim = c(0, NA), ylim = c(0, NA)) {
+                             xlim = c(NA, NA), ylim = c(NA, NA)) {
   if (!is.null(save_dir)) dir.create(save_dir)
+  data_metric_full <- NULL
   for (dir_idx in seq_along(results_dir)) {
     for (r in rank) {
       dir_rank <- file.path(results_dir[dir_idx], paste0(rank_prefix[dir_idx], r))
@@ -530,10 +534,10 @@ plot.multisnpnet <- function(results_dir, rank_prefix, type, rank,
       metric_train <- cbind(metric_train, lambda = 1:imax)
       metric_val <- cbind(metric_val, lambda = 1:imax)
 
-      table_train <- melt(as.data.frame(metric_train), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_train")
-      table_val <- melt(as.data.frame(metric_val), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_val")
-      data_metric <- inner_join(table_train, table_val, by = c("phenotype", "lambda"))
-      data_metric[["type"]] <- fit_types[dir_idx]
+      table_train <- reshape2::melt(as.data.frame(metric_train), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_train")
+      table_val <- reshape2::melt(as.data.frame(metric_val), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_val")
+      data_metric <- dplyr::inner_join(table_train, table_val, by = c("phenotype", "lambda"))
+      data_metric[["type"]] <- type[dir_idx]
       data_metric[["rank"]] <- factor(r, levels = as.character(rank))
 
       data_metric_full <- rbind(data_metric_full, data_metric)
@@ -596,7 +600,7 @@ plot.multisnpnet <- function(results_dir, rank_prefix, type, rank,
     gp[[phe]] <- ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
       geom_path() + geom_point() +
       xlab("metric (train)") + ylab("metric (val)") +
-      ylim(R2_lim) +
+      xlim(as.numeric(xlim)) + ylim(as.numeric(ylim)) +
       theme(axis.text=element_text(size=12), axis.title=element_text(size=12),
             legend.text=element_text(size=12), legend.title = element_text(size=12),
             legend.position = "bottom",
