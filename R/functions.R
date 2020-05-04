@@ -340,7 +340,7 @@ check_configs_diff <- function(old_configs, new_configs) {
 #'   provided lambda indices.
 #'
 #' @export
-coef.multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE) {
+coef_multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE) {
   if (is.null(fit) && is.null(fit_path)) {
     stop("Either fit object or file path to the saved object should be provided.\n")
   }
@@ -375,7 +375,7 @@ coef.multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
 #' @return A list containing the prediction and the resopnse for which the prediction is made.
 #'
 #' @export
-predict.multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new_phenotype_file,
+predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new_phenotype_file,
                                 idx = NULL, covariate_names = NULL, split_col = NULL, split_name = "test",
                                 zstd_path = "zstdcat") {
   if (is.null(fit) && is.null(saved_path)) {
@@ -485,7 +485,6 @@ predict.multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
 #' results_dir[i]/${rank_prefix}[i]${rank}[j]/${file_prefix}50${file_suffix}, and snpnet results are
 #' saved in ${snpnet_dir}/${phenotype}/${snpnet_subdir}/${snpnet_prefix}50${snpnet_suffix}
 #'
-#'
 #' @param results_dir Character vector each specifies the parent directory of one type (e.g. exact,
 #'   lazy) of results
 #' @param rank_prefix Character vector each specifies the prefix of the subdirectories holding
@@ -507,7 +506,7 @@ predict.multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
 #' @import ggplot2
 #'
 #' @export
-plot.multisnpnet <- function(results_dir, rank_prefix, type, rank,
+plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
                              file_prefix, file_suffix,
                              snpnet_dir = NULL, snpnet_subdir = NULL, snpnet_prefix = NULL, snpnet_suffix = NULL,
                              save_dir = NULL, train_name = "metric_train", val_name = "metric_val",
