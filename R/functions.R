@@ -549,7 +549,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       phe_dir <- file.path(snpnet_dir, phe, snpnet_subdir)  # results/results
       files_in_dir <- list.files(phe_dir)
       result_files <- files_in_dir[startsWith(files_in_dir, snpnet_prefix) & endsWith(files_in_dir, snpnet_suffix)]
-      max_iter <- max(as.numeric(gsub(suffix_result_file, "", gsub(pattern = snpnet_prefix, "", result_files))))
+      max_iter <- max(as.numeric(gsub(snpnet_suffix, "", gsub(pattern = snpnet_prefix, "", result_files))))
       latest_result <- file.path(phe_dir, paste0(snpnet_prefix, max_iter, snpnet_suffix))
 
       myenv <- new.env()
@@ -584,7 +584,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       dplyr::mutate(absolute_change = max_multisnpnet_val - max_snpnet_val,
                     relative_change = max_multisnpnet_val/abs(max_snpnet_val)-1,
                     direction = ifelse(relative_change > 0, "P", "N"))
-    gp[["r2_cmp_rel_change"]] <- ggplot(max_metric, aes(x = phenotype, y = pmin(relative_change*100, 100))) +
+    gp[["r2_cmp_rel_change"]] <- ggplot(max_metric, aes(x = phenotype, y = relative_change*100)) +
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
