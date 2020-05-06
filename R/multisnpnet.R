@@ -23,6 +23,9 @@
 #' @param lambda.min.ratio Ratio of the minimum penalty to the maximum penalty.
 #' @param standardize_response Boolean. Whether to standardize the responses before fitting to deal
 #'   with potential different units of the responses.
+#' @param p.factor Named vector of separate penalty factors applied to each coefficient. This is a
+#'   number that multiplies \code{lambda} to allow different shrinkage. Default is 1 for all
+#'   variables. Can specify partially and the rest will be set to 1. Must be positive.
 #' @param weight Numberic vector that specifies the (importance) weights for the responses.
 #' @param validation Boolean. Whether to evaluate on validation set.
 #' @param split_col Name of the column in the phenotype file that specifies whether each sample
@@ -48,9 +51,9 @@
 #' @importFrom magrittr '%>%'
 #'
 #' @export
-multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL,
-                        covariate_names, rank, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), standardize_response = TRUE,
-                        weight = NULL, validation = FALSE, split_col = NULL, mem = NULL,
+multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL, covariate_names,
+                        rank, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), standardize_response = TRUE,
+                        weight = NULL, p.factor = NULL, validation = FALSE, split_col = NULL, mem = NULL,
                         batch_size = 100, prev_iter = 0, max.iter = 10, configs = NULL, save = TRUE,
                         early_stopping = FALSE) {
 
@@ -122,6 +125,17 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   stats <- snpnet:::computeStats(genotype_file, ids_valid, configs = configs)
   vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0('zstdcat ', paste0(genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
 
+  if (is.null(p.factor)) {
+    p.factor <- rep(1, length(vars))
+    names(p.factor) <- vars
+  } else {
+    if (!all(vars %in% names(p.factor))) {
+      warning("p.factor does not cover all variants. The missing penalties are set to 1.\n")
+      p.factor[setdiff(vars, names(p.factor))] <- 1
+    }
+  }
+  p.factor[covariate_names] <- 0
+
   if (is.null(binary_phenotypes)) {
     binary_phenotypes <- phenotype_names[apply(as.matrix(phe_train[, phenotype_names, with = F]), 2, function(x) all(unique(x[!is.na(x)]) %in% c(1, 2)))]
     print(binary_phenotypes)
@@ -187,6 +201,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   prod_full <- snpnet:::computeProduct(fit_init$residual, genotype_file, vars, stats, configs, iter=0) / length(rowIdx_subset_gen)
   # }
   score <- row_norm2(prod_full)
+  score <- score / p.factor[names(score)]
   nobs <- n_subset_train
   nvars <- length(vars)-length(stats[["excludeSNP"]])
   configs[["lambda.min.ratio"]] <- lambda.min.ratio
@@ -234,8 +249,13 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     cat("Recover iteration ", prev_iter, ". Now time: ", as.character(Sys.time()), "\n", sep = "")
     load_start <- Sys.time()
     new_configs <- configs
+    new_pfactor <- p.factor
     load(file.path(configs[["results.dir"]], paste0("output_lambda_", prev_iter, ".RData")))
     check_configs_diff(configs, new_configs)
+    if (!identical(new_pfactor, p.factor)) {
+      warning("New p.factor and the saved p.factor are not the same. The new p.factor will be used.\n")  # to allow for running from old results; backward compatibility
+    }
+    p.factor <- new_pfactor
     configs <- new_configs
     start_lambda <- ilam + 1
     if (rank == ncol(response_train) && !is.null(covariates_train)) {
@@ -306,12 +326,14 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       }
       if (rank == ncol(response_train) || ilam < 3) {
         if (rank == ncol(response_train)) {
-          penalty_factor <- rep(1, ncol(features_train))
+          # penalty_factor <- rep(1, ncol(features_train))
+          penalty_factor <- p.factor[colnames(features_train)]
         } else {
           features_train_combined <- cbind(covariates_train, features_train)
-          penalty_factor <- rep(1, ncol(features_train_combined))
+          # penalty_factor <- rep(1, ncol(features_train_combined))
+          penalty_factor <- p.factor[colnames(features_train_combined)]
         }
-        penalty_factor[seq_len(length(covariate_names))] <- 0
+        penalty_factor[covariate_names] <- 0
         lam_adjusted <- full_lams[ilam] * sum(penalty_factor) / length(penalty_factor)  # adjustment to counteract automatic normalization in glmnet
         if (rank == ncol(response_train)) {
           fit <- alternate_Y_glmnet(features_train, response_train, missing_response_train,
@@ -343,6 +365,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       cat("Start checking KKT condition ...\n")
       prod_resid <- snpnet:::computeProduct(residuals, genotype_file, vars, stats, configs, iter=0) / length(rowIdx_subset_gen)
       norm_prod <- row_norm2(prod_resid)
+      norm_prod <- norm_prod / p.factor[names(norm_prod)]
       norm_prod[configs[["excludeSNP"]]] <- NA
       norm_prod_inner <- norm_prod
       norm_prod_inner[setdiff(colnames(features_train), covariate_names)] <- NA
@@ -428,7 +451,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     if (save) {
       feature_names <- setdiff(colnames(features_train), covariate_names)
       save(fit, ilam, current_active, active, feature_names, norm_prod, B_init, W_init, A_init,
-           metric_train, metric_val, AUC_train, AUC_val, nactive, weight, configs,
+           metric_train, metric_val, AUC_train, AUC_val, nactive, weight, configs, p.factor,
            file = file.path(configs[["results.dir"]], paste0("output_lambda_", ilam, ".RData")))
       saveRDS(fit_list, file = file.path(configs[["results.dir"]], "fit_list.rds"))
     }

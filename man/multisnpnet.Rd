@@ -33,6 +33,10 @@ with potential different units of the responses.}
 
 \item{weight}{Numberic vector that specifies the (importance) weights for the responses.}
 
+\item{p.factor}{Named vector of separate penalty factors applied to each coefficient. This is a
+number that multiplies \code{lambda} to allow different shrinkage. Default is 1 for all
+variables. Can specify the penalties partially and the rest will be set to 1.}
+
 \item{validation}{Boolean. Whether to evaluate on validation set.}
 
 \item{split_col}{Name of the column in the phenotype file that specifies whether each sample
