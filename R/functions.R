@@ -509,7 +509,7 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
 plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
                              file_prefix, file_suffix,
                              snpnet_dir = NULL, snpnet_subdir = NULL, snpnet_prefix = NULL, snpnet_suffix = NULL,
-                             save_dir = NULL, train_name = "metric_train", val_name = "metric_val",
+                             save_dir = NULL, train_name = "metric_train", val_name = "metric_val", metric_name = "R2",
                              xlim = c(NA, NA), ylim = c(NA, NA)) {
   if (!is.null(save_dir)) dir.create(save_dir)
   data_metric_full <- NULL
@@ -588,17 +588,17 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      xlab("phenotypes") + ylab("R2 Relative Change (%)")
+      xlab("phenotypes") + ylab(paste(metric_name, "Relative Change (%)"))
     if (!is.null(save_dir)) {
-      save_path <- file.path(save_dir, "R2_cmp_rel_change.pdf")
-      ggsave(save_path, plot = gp[["r2_cmp_rel_change"]])
+      save_path <- file.path(save_dir, paste0(metric_name, "_cmp_rel_change.pdf"))
+      ggsave(save_path, plot = gp[[paste0(metric_name, "_cmp_rel_change")]])
     }
   }
 
   for (phe in as.character(unique(data_metric[["phenotype"]]))) {
     gp[[phe]] <- ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
       geom_path() + geom_point() +
-      xlab("metric (train)") + ylab("metric (val)") +
+      xlab(paste(metric_name, "(train)")) + ylab(paste(metric_name, "(val)")) +
       xlim(as.numeric(xlim)) + ylim(as.numeric(ylim)) +
       theme(axis.text=element_text(size=12), axis.title=element_text(size=12),
             legend.text=element_text(size=12), legend.title = element_text(size=12),
@@ -606,7 +606,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
             strip.text.x = element_text(size = 12), strip.text.y = element_text(size = 12)) +
       ggtitle(phe)
     if (!is.null(save_dir)) {
-      save_path <- file.path(save_dir, paste0("metric_plot_", phe, ".pdf"))
+      save_path <- file.path(save_dir, paste0(metric_name, "_plot_", phe, ".pdf"))
       ggsave(save_path, plot = gp[[phe]])
     }
   }
