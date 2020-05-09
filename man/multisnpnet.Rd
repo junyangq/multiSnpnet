@@ -35,7 +35,7 @@ with potential different units of the responses.}
 
 \item{p.factor}{Named vector of separate penalty factors applied to each coefficient. This is a
 number that multiplies \code{lambda} to allow different shrinkage. Default is 1 for all
-variables. Can specify the penalties partially and the rest will be set to 1.}
+variables. Can specify partially and the rest will be set to 1. Must be positive.}
 
 \item{validation}{Boolean. Whether to evaluate on validation set.}
 

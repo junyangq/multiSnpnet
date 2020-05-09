@@ -1,6 +1,9 @@
-setupMultiConfigs <- function(configs, standardize_response, max.iter, rank, prev_iter, batch_size) {
+setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_names, covariate_names,
+                              nlambda, mem,
+                              standardize_response, max.iter, rank, prev_iter, batch_size) {
   out.args <- as.list(environment())
   defaults_multi <- list(
+
     is.warm.start = TRUE,
     is.A.converge = TRUE,
     thresh = 1e-7
@@ -377,7 +380,7 @@ coef_multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
 #' @export
 predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new_phenotype_file,
                                 idx = NULL, covariate_names = NULL, split_col = NULL, split_name = NULL,
-                                zstd_path = "zstdcat") {
+                                zstdcat_path = "zstdcat") {
   if (is.null(fit) && is.null(saved_path)) {
     stop("Either fit object or file path to the saved object should be provided.\n")
   }
@@ -428,6 +431,8 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
     dplyr::arrange(sort_order) %>% dplyr::select(-sort_order) %>%
     data.table::as.data.table()
 
+  fill_missing(phe_master, phenotype_names, -9, NA)
+
   if (is.null(split_col)) {
     split_name <- "train"
     ids[["train"]] <- phe_master$ID
@@ -476,9 +481,12 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   }
 
   pred <- list()
+  R2 <- list()
   for (split in split_name) {
     pred[[split]] <- array(dim = c(nrow(features[[split]]), length(fit[[length(fit)]][["a0"]]), length(fit)),
                   dimnames = list(ids[[split]], phenotype_names, seq_along(fit)))
+    R2[[split]] <- array(dim = c(length(meta_fit[["a0"]]), length(fit)),
+                         dimnames = list(phenotype_names, seq_along(fit)))
   }
 
   for (i in seq_along(fit)) {
@@ -490,8 +498,11 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
         features_single <- as.matrix(features[[split]][, rownames(fit[[i]]$CC), with = F])
         pred_single <- sweep(features_single %*% fit[[i]]$CC, 2, fit[[i]]$a0, FUN = "+")
       }
+      pred_single <- as.matrix(pred_single)
+      colnames(pred_single) <- names(fit[[i]]$a0)
       pred_single <- multisnpnet:::y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight)
       pred[[split]][, , i] <- as.matrix(pred_single)
+      R2[[split]][, i] <- 1 - apply((pred[[split]][, , i] - response[[split]])^2, 2, mean, na.rm = T) / variance[[split]]
     }
   }
 

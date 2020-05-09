@@ -18,6 +18,10 @@ plot_multisnpnet(
   save_dir = NULL,
   train_name = "metric_train",
   val_name = "metric_val",
+  metric_name = "R2",
+  train_bin_name = "AUC_train",
+  val_bin_name = "AUC_val",
+  metric_bin_name = "AUC",
   xlim = c(NA, NA),
   ylim = c(NA, NA)
 )

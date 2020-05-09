@@ -12,8 +12,8 @@ predict_multisnpnet(
   idx = NULL,
   covariate_names = NULL,
   split_col = NULL,
-  split_name = "test",
-  zstd_path = "zstdcat"
+  split_name = NULL,
+  zstdcat_path = "zstdcat"
 )
 }
 \arguments{
@@ -32,7 +32,7 @@ must exist.}
 
 \item{split_col}{Name of the split column. If NULL, all samples will be used.}
 
-\item{split_name}{Label for the samples where prediction is to be made.}
+\item{split_name}{Vector of split labels where prediction is to be made.}
 
 \item{zstdcat_path}{Path to zstdcat program, needed when loading variants}
 }
