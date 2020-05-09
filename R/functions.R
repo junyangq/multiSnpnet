@@ -3,7 +3,36 @@ setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_
                               standardize_response, max.iter, rank, prev_iter, batch_size) {
   out.args <- as.list(environment())
   defaults_multi <- list(
-
+    missing.rate = 0.1,
+    MAF.thresh = 0.001,
+    nCores = 1,
+    glmnet.thresh = 1e-07,
+    nlams.init = 10,
+    nlams.delta = 5,
+    vzs=TRUE, # geno.pfile vzs
+    increase.size = NULL,
+    standardize.variant = FALSE,
+    early.stopping = TRUE,
+    stopping.lag = 2,
+    niter = 10,
+    lambda.min.ratio = NULL,
+    KKT.verbose = FALSE,
+    use.glmnetPlus = NULL,
+    save = FALSE,
+    save.computeProduct = FALSE,
+    prevIter = 0,
+    results.dir = NULL,
+    meta.dir = 'meta',
+    save.dir = 'results',
+    verbose = FALSE,
+    KKT.check.aggressive.experimental = FALSE,
+    gcount.basename.prefix = 'snpnet.train',
+    gcount.full.prefix=NULL,
+    endian="little",
+    metric=NULL,
+    plink2.path='plink2',
+    zstdcat.path='zstdcat',
+    rank = TRUE,
     is.warm.start = TRUE,
     is.A.converge = TRUE,
     thresh = 1e-7
@@ -16,6 +45,19 @@ setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_
       configs[[name]] <- defaults_multi[[name]]
     }
   }
+
+  # update settings
+  if(is.null(configs[['increase.size']]))  configs[['increase.size']] <- configs[['batch_size']]/2
+
+  # We will write some intermediate files to meta.dir and save.dir.
+  # those files will be deleted with snpnet::cleanUpIntermediateFiles() function.
+  if (is.null(configs[['results.dir']])) configs[['results.dir']] <- tempdir(check = TRUE)
+  dir.create(file.path(configs[['results.dir']], configs[["meta.dir"]]), showWarnings = FALSE, recursive = T)
+  dir.create(file.path(configs[['results.dir']], configs[["save.dir"]]), showWarnings = FALSE, recursive = T)
+  if(is.null(configs[['gcount.full.prefix']])) configs[['gcount.full.prefix']] <- file.path(
+    configs[['results.dir']], configs[["meta.dir"]], configs['gcount.basename.prefix']
+  )
+
   configs
 }
 

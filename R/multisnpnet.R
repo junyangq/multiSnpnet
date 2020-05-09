@@ -57,8 +57,8 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
                         batch_size = 100, prev_iter = 0, max.iter = 10, configs = NULL, save = TRUE,
                         early_stopping = FALSE) {
 
-  configs <- snpnet:::setupConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names, "gaussian", 1.0, nlambda, mem)
-  configs <- setupMultiConfigs(configs, standardize_response, max.iter, rank, prev_iter, batch_size)
+  configs <- setupMultiConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names,
+                               nlambda, mem, standardize_response, max.iter, rank, prev_iter, batch_size)
 
   start_all <- Sys.time()
 
