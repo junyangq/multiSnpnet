@@ -369,14 +369,14 @@ coef_multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
 #' @param idx Lambda indices where the coefficients are requested.
 #' @param covariate_names Character vector of the names of the adjustment covariates.
 #' @param split_col Name of the split column. If NULL, all samples will be used.
-#' @param split_name Label for the samples where prediction is to be made.
+#' @param split_name Vector of split labels where prediction is to be made.
 #' @param zstdcat_path Path to zstdcat program, needed when loading variants
 #'
 #' @return A list containing the prediction and the resopnse for which the prediction is made.
 #'
 #' @export
 predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new_phenotype_file,
-                                idx = NULL, covariate_names = NULL, split_col = NULL, split_name = "test",
+                                idx = NULL, covariate_names = NULL, split_col = NULL, split_name = NULL,
                                 zstd_path = "zstdcat") {
   if (is.null(fit) && is.null(saved_path)) {
     stop("Either fit object or file path to the saved object should be provided.\n")
@@ -429,22 +429,35 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
     data.table::as.data.table()
 
   if (is.null(split_col)) {
-    ids[[split_name]] <- phe_master$ID
+    split_name <- "train"
+    ids[["train"]] <- phe_master$ID
   } else {
-    ids[[split_name]] <- phe_master$ID[phe_master[[split_col]] == split_name]
+    for (split in split_name) {
+      ids[[split]] <- phe_master$ID[phe_master[[split_col]] == split]
+    }
   }
 
-  phe_test <- phe_master[match(ids[[split_name]], phe_master[["ID"]])]
+  phe <- list()
+  for (split in split_name) {
+    phe[[split]] <- phe_master[match(ids[[split]], phe_master[["ID"]])]
+  }
 
-  if (length(covariate_names) > 0) {
-    covariates <- phe_test[, covariate_names, with = FALSE]
-  } else {
-    covariates <- NULL
+  covariates <- list()
+
+  for (split in split_name) {
+    if (length(covariate_names) > 0) {
+      covariates[[split]] <- phe[[split]][, covariate_names, with = FALSE]
+    } else {
+      covariates[[split]] <- NULL
+    }
   }
 
   vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0(zstdcat_path, ' ', paste0(new_genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
   pvar <- pgenlibr::NewPvar(paste0(new_genotype_file, '.pvar.zst'))
-  chr <- pgenlibr::NewPgen(paste0(new_genotype_file, '.pgen'), pvar = pvar, sample_subset = match(ids[[split_name]], ids[["psam"]]))
+  chr <- list()
+  for (split in split_name) {
+    chr[[split]] <- pgenlibr::NewPgen(paste0(new_genotype_file, '.pgen'), pvar = pvar, sample_subset = match(ids[[split]], ids[["psam"]]))
+  }
   pgenlibr::ClosePvar(pvar)
 
   feature_names <- c()
@@ -453,29 +466,41 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   }
   feature_names <- unique(feature_names)
 
-  if (!is.null(covariates) && is_full_rank) {
-    features <- data.table(covariates)
-    features[, (feature_names) := snpnet:::prepareFeatures(chr, vars, feature_names, stats)]
-  } else {
-    features <- snpnet:::prepareFeatures(chr, vars, feature_names, stats)
+  for (split in split_name) {
+    if (!is.null(covariates[[split]]) && is_full_rank) {
+      features[[split]] <- data.table(covariates[[split]])
+      features[[split]][, (feature_names) := snpnet:::prepareFeatures(chr[[split]], vars, feature_names, stats)]
+    } else {
+      features[[split]] <- snpnet:::prepareFeatures(chr[[split]], vars, feature_names, stats)
+    }
   }
 
-  pred <- array(dim = c(nrow(features), length(fit[[length(fit)]][["a0"]]), length(fit)),
-                dimnames = list(ids[[split_name]], phenotype_names, seq_along(fit)))
+  pred <- list()
+  for (split in split_name) {
+    pred[[split]] <- array(dim = c(nrow(features[[split]]), length(fit[[length(fit)]][["a0"]]), length(fit)),
+                  dimnames = list(ids[[split]], phenotype_names, seq_along(fit)))
+  }
 
   for (i in seq_along(fit)) {
-    if (!is.null(covariates) && !is_full_rank) {
-      features_single <- as.matrix(features[, rownames(fit[[i]]$C), with = F])
-      pred_single <- as.matrix(covariates) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C, 2, fit[[i]]$a0, FUN = "+")
-    } else {
-      features_single <- as.matrix(features[, rownames(fit[[i]]$CC), with = F])
-      pred_single <- sweep(features_single %*% fit[[i]]$CC, 2, fit[[i]]$a0, FUN = "+")
+    for (split in split_name) {
+      if (!is.null(covariates[[split]]) && !is_full_rank) {
+        features_single <- as.matrix(features[[split]][, rownames(fit[[i]]$C), with = F])
+        pred_single <- as.matrix(covariates[[split]]) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C, 2, fit[[i]]$a0, FUN = "+")
+      } else {
+        features_single <- as.matrix(features[[split]][, rownames(fit[[i]]$CC), with = F])
+        pred_single <- sweep(features_single %*% fit[[i]]$CC, 2, fit[[i]]$a0, FUN = "+")
+      }
+      pred_single <- multisnpnet:::y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight)
+      pred[[split]][, , i] <- as.matrix(pred_single)
     }
-    pred_single <- multisnpnet:::y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight)
-    pred[, , i] <- as.matrix(pred_single)
   }
 
-  list(prediction = pred, response = as.matrix(phe_test[, phenotype_names, with = F]))
+  response <- list()
+  for (split in split_name) {
+    response[[split]] <- as.matrix(phe[[split]][, phenotype_names, with = F])
+  }
+
+  list(prediction = pred, response = response)
 }
 
 
@@ -510,9 +535,11 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
                              file_prefix, file_suffix,
                              snpnet_dir = NULL, snpnet_subdir = NULL, snpnet_prefix = NULL, snpnet_suffix = NULL,
                              save_dir = NULL, train_name = "metric_train", val_name = "metric_val", metric_name = "R2",
+                             train_bin_name = "AUC_train", val_bin_name = "AUC_val", metric_bin_name = "AUC",
                              xlim = c(NA, NA), ylim = c(NA, NA)) {
   if (!is.null(save_dir)) dir.create(save_dir)
   data_metric_full <- NULL
+  bin_names <- c()
   for (dir_idx in seq_along(results_dir)) {
     for (r in rank) {
       dir_rank <- file.path(results_dir[dir_idx], paste0(rank_prefix[dir_idx], r))
@@ -525,6 +552,13 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       load(latest_result, envir = myenv)
       metric_train <- myenv[[train_name]]
       metric_val <- myenv[[val_name]]
+      if (exists(train_bin_name) && exists(val_bin_name)) {
+        AUC_train <- myenv[[train_bin_name]]
+        AUC_val <- myenv[[val_bin_name]]
+        bin_names <- unique(c(bin_names, colnames(AUC_train)))
+        metric_train[, colnames(AUC_train)] <- AUC_train
+        metric_val[, colnames(AUC_val)] <- AUC_val
+      }
       imax_train <- max(which(apply(metric_train, 1, function(x) sum(is.na(x))) == 0))
       imax_val <- max(which(apply(metric_val, 1, function(x) sum(is.na(x))) == 0))
       imax <- min(imax_train, imax_val)
@@ -584,21 +618,22 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       dplyr::mutate(absolute_change = max_multisnpnet_val - max_snpnet_val,
                     relative_change = max_multisnpnet_val/abs(max_snpnet_val)-1,
                     direction = ifelse(relative_change > 0, "P", "N"))
-    gp[["r2_cmp_rel_change"]] <- ggplot(max_metric, aes(x = phenotype, y = relative_change*100)) +
+    gp[["metric_cmp_rel_change"]] <- ggplot(max_metric, aes(x = phenotype, y = relative_change*100)) +
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      xlab("phenotypes") + ylab(paste(metric_name, "Relative Change (%)"))
+      xlab("phenotypes") + ylab("Metric Relative Change (%)")
     if (!is.null(save_dir)) {
-      save_path <- file.path(save_dir, paste0(metric_name, "_cmp_rel_change.pdf"))
-      ggsave(save_path, plot = gp[[paste0(metric_name, "_cmp_rel_change")]])
+      save_path <- file.path(save_dir, "metric_cmp_rel_change.pdf")
+      ggsave(save_path, plot = gp[["metric_cmp_rel_change"]])
     }
   }
 
   for (phe in as.character(unique(data_metric[["phenotype"]]))) {
+    mname <- ifelse(phe %in% bin_names, metric_bin_name, metric_name)
     gp[[phe]] <- ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
       geom_path() + geom_point() +
-      xlab(paste(metric_name, "(train)")) + ylab(paste(metric_name, "(val)")) +
+      xlab(paste(mname, "(train)")) + ylab(paste(mname, "(val)")) +
       xlim(as.numeric(xlim)) + ylim(as.numeric(ylim)) +
       theme(axis.text=element_text(size=12), axis.title=element_text(size=12),
             legend.text=element_text(size=12), legend.title = element_text(size=12),
@@ -606,7 +641,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
             strip.text.x = element_text(size = 12), strip.text.y = element_text(size = 12)) +
       ggtitle(phe)
     if (!is.null(save_dir)) {
-      save_path <- file.path(save_dir, paste0(metric_name, "_plot_", phe, ".pdf"))
+      save_path <- file.path(save_dir, paste0(mname, "_plot_", phe, ".pdf"))
       ggsave(save_path, plot = gp[[phe]])
     }
   }
