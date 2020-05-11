@@ -422,7 +422,7 @@ coef_multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
 #' @export
 predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new_phenotype_file,
                                 idx = NULL, covariate_names = NULL, split_col = NULL, split_name = NULL,
-                                zstdcat_path = "zstdcat") {
+                                binary_phenotypes = NULL, zstdcat_path = "zstdcat") {
   if (is.null(fit) && is.null(saved_path)) {
     stop("Either fit object or file path to the saved object should be provided.\n")
   }
@@ -446,8 +446,8 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   stats <- fit[[length(fit)]][["stats"]]
   std_obj <- fit[[length(fit)]][["std_obj"]]
   weight <- fit[[length(fit)]][["weight"]]
-  phenotype_names <- colnames(fit[[length(fit)]][["C"]])
-  is_full_rank <- (ncol(fit[[length(fit)]][["B"]]) == ncol(fit[[length(fit)]][["C"]]))
+  phenotype_names <- colnames(as.matrix(fit[[length(fit)]][["C"]]))
+  is_full_rank <- (ncol(as.matrix(fit[[length(fit)]][["B"]])) == ncol(as.matrix(fit[[length(fit)]][["C"]])))
 
   covariate_names_fit <- rownames(fit[[length(fit)]][["W"]])
   if (!setequal(covariate_names_fit, covariate_names)) {
@@ -481,12 +481,20 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   } else {
     for (split in split_name) {
       ids[[split]] <- phe_master$ID[phe_master[[split_col]] == split]
+      if (length(ids[[split]]) == 0) {
+        warning(paste("Split", split, "doesn't exist in the phenotype file. Excluded from prediction.\n"))
+        split_name <- setdiff(split_name, split)
+      }
     }
+  }
+  for (split in split_name) {
+    ids[[split]] <- ids[[split]][!is.na(ids[[split]])]
   }
 
   phe <- list()
   for (split in split_name) {
-    phe[[split]] <- phe_master[match(ids[[split]], phe_master[["ID"]])]
+    ids_loc <- match(ids[[split]], phe_master[["ID"]])
+    phe[[split]] <- phe_master[ids_loc]
   }
 
   covariates <- list()
@@ -509,13 +517,14 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
 
   feature_names <- c()
   for (i in seq_along(fit)) {
-    feature_names <- c(feature_names, rownames(fit[[i]]$B))
+    feature_names <- c(feature_names, which_row_active(fit[[i]]$B))
   }
   feature_names <- unique(feature_names)
 
+  features <- list()
   for (split in split_name) {
     if (!is.null(covariates[[split]]) && is_full_rank) {
-      features[[split]] <- data.table(covariates[[split]])
+      features[[split]] <- data.table::data.table(covariates[[split]])
       features[[split]][, (feature_names) := snpnet:::prepareFeatures(chr[[split]], vars, feature_names, stats)]
     } else {
       features[[split]] <- snpnet:::prepareFeatures(chr[[split]], vars, feature_names, stats)
@@ -524,36 +533,67 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
 
   pred <- list()
   R2 <- list()
+  if (length(binary_phenotypes) > 0) AUC <- list()
   for (split in split_name) {
     pred[[split]] <- array(dim = c(nrow(features[[split]]), length(fit[[length(fit)]][["a0"]]), length(fit)),
                   dimnames = list(ids[[split]], phenotype_names, seq_along(fit)))
-    R2[[split]] <- array(dim = c(length(meta_fit[["a0"]]), length(fit)),
+    R2[[split]] <- array(dim = c(length(fit[[length(fit)]][["a0"]]), length(fit)),
                          dimnames = list(phenotype_names, seq_along(fit)))
+    if (length(binary_phenotypes) > 0) {
+      AUC[[split]] <- array(dim = c(length(binary_phenotypes), length(fit)),
+                            dimnames = list(binary_phenotypes, seq_along(fit)))
+    }
+  }
+
+  response <- list()
+  variance <- list()
+  for (split in split_name) {
+    response[[split]] <- as.matrix(phe[[split]][, phenotype_names, with = F])
+    if (length(binary_phenotypes) > 0) {
+      response[[split]][, binary_phenotypes] <- response[[split]][, binary_phenotypes] - 1
+    }
+    variance[[split]] <- apply(response[[split]], 2, function(x) mean((x - mean(x, na.rm = T))^2, na.rm = T))
   }
 
   for (i in seq_along(fit)) {
     for (split in split_name) {
       if (!is.null(covariates[[split]]) && !is_full_rank) {
-        features_single <- as.matrix(features[[split]][, rownames(fit[[i]]$C), with = F])
-        pred_single <- as.matrix(covariates[[split]]) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C, 2, fit[[i]]$a0, FUN = "+")
+        active_vars <- which_row_active(fit[[i]]$C)
+        if (length(active_vars) > 0) {
+          features_single <- as.matrix(features[[split]][, active_vars, with = F])
+        } else {
+          features_single <- matrix(0, nrow = nrow(features[[split]]), ncol = 0)
+        }
+        pred_single <- as.matrix(covariates[[split]]) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
       } else {
-        features_single <- as.matrix(features[[split]][, rownames(fit[[i]]$CC), with = F])
-        pred_single <- sweep(features_single %*% fit[[i]]$CC, 2, fit[[i]]$a0, FUN = "+")
+        active_vars <- which_row_active(fit[[i]]$CC)
+        if (length(active_vars) > 0) {
+          features_single <- as.matrix(features[[split]][, active_vars, with = F])
+        } else {
+          feature_single <- matrix(0, nrow = nrow(features[[split]]), ncol = 0)
+        }
+        pred_single <- sweep(features_single %*% fit[[i]]$CC[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
       }
       pred_single <- as.matrix(pred_single)
-      colnames(pred_single) <- names(fit[[i]]$a0)
-      pred_single <- multisnpnet:::y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight)
+      colnames(pred_single) <- colnames(fit[[i]]$C)
+      pred_single <- y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight)
       pred[[split]][, , i] <- as.matrix(pred_single)
       R2[[split]][, i] <- 1 - apply((pred[[split]][, , i] - response[[split]])^2, 2, mean, na.rm = T) / variance[[split]]
+      if (length(binary_phenotypes) > 0) {
+        for (bphe in binary_phenotypes) {
+          not_missing <- !is.na(response[[split]][, bphe])
+          pred_obj <- ROCR::prediction(pred_single[not_missing, bphe], response[[split]][not_missing, bphe])
+          auc_obj <- ROCR::performance(pred_obj, measure = 'auc')
+          AUC[[split]][bphe, i] <- auc_obj@y.values[[1]]
+        }
+      }
     }
   }
 
-  response <- list()
-  for (split in split_name) {
-    response[[split]] <- as.matrix(phe[[split]][, phenotype_names, with = F])
-  }
+  out <- list(prediction = pred, response = response, R2 = R2)
+  if (length(binary_phenotypes) > 0) out[["AUC"]] <- AUC
 
-  list(prediction = pred, response = response)
+  out
 }
 
 
@@ -699,4 +739,19 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
     }
   }
   gp
+}
+
+safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 4) {
+  ncol.chunk <- floor(MAXLEN / as.double(nrow(X)))  # depends on the memory requirements
+  numChunks <- ceiling(ncol(X) / as.double(ncol.chunk))
+  for (jc in 1:numChunks) {
+    # print(jc)
+    idx <- ((jc-1)*ncol.chunk+1):min(jc*ncol.chunk, ncol(X))
+    if (jc == 1) {
+      out <- X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
+    } else {
+      out <- nfit + X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
+    }
+  }
+  out
 }
