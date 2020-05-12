@@ -634,7 +634,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
                              save_dir = NULL, train_name = "metric_train", val_name = "metric_val", test_name = NULL, metric_name = "R2",
                              train_bin_name = "AUC_train", val_bin_name = "AUC_val", test_bin_name = "AUC_test", metric_bin_name = "AUC",
                              xlim = c(NA, NA), ylim = c(NA, NA), mapping_phenotype = NULL) {
-  if (!is.null(save_dir)) dir.create(save_dir)
+  if (!is.null(save_dir)) dir.create(save_dir, recursive = T)
   data_metric_full <- NULL
   bin_names <- c()
   for (dir_idx in seq_along(results_dir)) {
@@ -719,6 +719,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
   }
 
   if (!is.null(mapping_phenotype)) {
+    data_metric_full$phenotype <- as.character(data_metric_full$phenotype)
     for (phe in names(mapping_phenotype)) {
       data_metric_full$phenotype[data_metric_full$phenotype == phe] <- mapping_phenotype[phe]
     }
@@ -749,7 +750,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      xlab("Phenotypes") + ylab("Metric Absolute Change (%)")
+      xlab("Phenotypes") + ylab("Metric Absolute Change")
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_abs_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_abs_change"]])
