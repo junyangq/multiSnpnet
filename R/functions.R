@@ -631,8 +631,8 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
 plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
                              file_prefix, file_suffix,
                              snpnet_dir = NULL, snpnet_subdir = NULL, snpnet_prefix = NULL, snpnet_suffix = NULL,
-                             save_dir = NULL, train_name = "metric_train", val_name = "metric_val", metric_name = "R2",
-                             train_bin_name = "AUC_train", val_bin_name = "AUC_val", metric_bin_name = "AUC",
+                             save_dir = NULL, train_name = "metric_train", val_name = "metric_val", test_name = NULL, metric_name = "R2",
+                             train_bin_name = "AUC_train", val_bin_name = "AUC_val", test_bin_name = "AUC_test", metric_bin_name = "AUC",
                              xlim = c(NA, NA), ylim = c(NA, NA), mapping_phenotype = NULL) {
   if (!is.null(save_dir)) dir.create(save_dir)
   data_metric_full <- NULL
@@ -649,16 +649,26 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       load(latest_result, envir = myenv)
       metric_train <- myenv[[train_name]]
       metric_val <- myenv[[val_name]]
+      if (!is.null(test_name)) metric_test <- myenv[[test_name]]
       if ((train_bin_name %in% names(myenv)) && (val_bin_name %in% names(myenv))) {
         AUC_train <- myenv[[train_bin_name]]
         AUC_val <- myenv[[val_bin_name]]
+        if (!is.null(test_name)) AUC_test <- myenv[[test_bin_name]]
         bin_names <- unique(c(bin_names, colnames(AUC_train)))
         metric_train[, colnames(AUC_train)] <- AUC_train
         metric_val[, colnames(AUC_val)] <- AUC_val
+        if (!is.null(test_name)) metric_test[, colnames(AUC_test)] <- AUC_test
       }
       imax_train <- max(which(apply(metric_train, 1, function(x) sum(is.na(x))) == 0))
       imax_val <- max(which(apply(metric_val, 1, function(x) sum(is.na(x))) == 0))
       imax <- min(imax_train, imax_val)
+      if (!is.null(test_name)) {
+        imax_test <- max(which(apply(metric_test, 1, function(x) sum(is.na(x))) == 0))
+        imax <- min(imax, imax_test)
+        metric_test <- metric_test[1:imax, , drop = F]
+        metric_test <- cbind(metric_test, lambda = 1:imax)
+        table_test <- reshape2::melt(as.data.frame(metric_test), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_test")
+      }
       metric_train <- metric_train[1:imax, , drop = F]
       metric_val <- metric_val[1:imax, , drop = F]
       metric_train <- cbind(metric_train, lambda = 1:imax)
@@ -667,6 +677,9 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       table_train <- reshape2::melt(as.data.frame(metric_train), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_train")
       table_val <- reshape2::melt(as.data.frame(metric_val), id.vars = "lambda", variable.name = "phenotype", value.name = "metric_val")
       data_metric <- dplyr::inner_join(table_train, table_val, by = c("phenotype", "lambda"))
+      if (!is.null(test_name)) {
+        data_metric <- dplyr::inner_join(data_metric, table_test, by = c("phenotype", "lambda"))
+      }
       data_metric[["type"]] <- type[dir_idx]
       data_metric[["rank"]] <- factor(r, levels = as.character(rank))
 
@@ -687,13 +700,19 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       load(latest_result, envir = myenv)
       metric_train <- myenv[["metric.train"]]
       metric_val <- myenv[["metric.val"]]
+      if (!is.null(test_name)) {
+        metric_test <- myenv[["metric.test"]]
+        imax_test <- max(which(!is.na(metric_test)))
+      }
 
       imax_train <- max(which(!is.na(metric_train)))
       imax_val <- max(which(!is.na(metric_val)))
       imax <- min(imax_train, imax_val)
+      if (!is.null(test_name)) imax <- min(imax, imax_test)
 
       table_snpnet <- data.frame(lambda = 1:imax, phenotype = rep(phe, imax), metric_train = metric_train[1:imax],
                                  metric_val = metric_val[1:imax], type = "exact", rank = "snpnet")
+      if (!is.null(test_name)) table_snpnet[["metric_test"]] <- metric_test[1:imax]
 
       data_metric_full <- rbind(data_metric_full, table_snpnet)
     }
@@ -711,11 +730,15 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
     max_metric_reduced_rank <- data_metric_full %>%
       dplyr::filter(rank != "snpnet") %>%
       dplyr::group_by(phenotype) %>%
-      dplyr::summarise(max_multisnpnet_val = max(metric_val))
+      dplyr::filter(metric_val == max(metric_val)) %>%
+      dplyr::mutate(max_multisnpnet_val = ifelse(!is.null(test_name), metric_test, metric_val)) %>%
+      dplyr::select(phenotype, max_multisnpnet_val, rank, lambda)
     max_metric_snpnet <- data_metric_full %>%
       dplyr::filter(rank == "snpnet") %>%
       dplyr::group_by(phenotype) %>%
-      dplyr::summarise(max_snpnet_val = max(metric_val))
+      dplyr::filter(metric_val == max(metric_val)) %>%
+      dplyr::mutate(max_snpnet_val = ifelse(!is.null(test_name), metric_test, metric_val)) %>%
+      dplyr::select(phenotype, max_snpnet_val)
     max_metric <- max_metric_reduced_rank %>%
       dplyr::inner_join(max_metric_snpnet, by = "phenotype") %>%
       dplyr::mutate(absolute_change = max_multisnpnet_val - max_snpnet_val,
