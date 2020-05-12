@@ -564,10 +564,11 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
         } else {
           features_single <- matrix(0, nrow = nrow(features[[split]]), ncol = 0)
         }
+        pred_var <- safe_product(features_single, fit[[i]]$C[active_vars, , drop = F])
         if (is.null(fit[[i]]$W) || nrow(fit[[i]]$W) < ncol(covariates[[split]])) {
-          pred_single <- sweep(features_single %*% fit[[i]]$C[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
+          pred_single <- sweep(pred_var, 2, fit[[i]]$a0, FUN = "+")
         } else {
-          pred_single <- as.matrix(covariates[[split]]) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
+          pred_single <- as.matrix(covariates[[split]]) %*% fit[[i]]$W + sweep(pred_var, 2, fit[[i]]$a0, FUN = "+")
         }
       } else {
         active_vars <- which_row_active(fit[[i]]$CC)
@@ -576,7 +577,8 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
         } else {
           feature_single <- matrix(0, nrow = nrow(features[[split]]), ncol = 0)
         }
-        pred_single <- sweep(features_single %*% fit[[i]]$CC[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
+        pred_var <- safe_product(features_single, fit[[i]]$CC[active_vars, , drop = F])
+        pred_single <- sweep(pred_var, 2, fit[[i]]$a0, FUN = "+")
       }
       pred_single <- as.matrix(pred_single)
       colnames(pred_single) <- colnames(fit[[i]]$C)
@@ -813,7 +815,7 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 4) {
     if (jc == 1) {
       out <- X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
     } else {
-      out <- nfit + X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
+      out <- out + X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
     }
   }
   out
