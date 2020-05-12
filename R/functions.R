@@ -564,7 +564,11 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
         } else {
           features_single <- matrix(0, nrow = nrow(features[[split]]), ncol = 0)
         }
-        pred_single <- as.matrix(covariates[[split]]) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
+        if (is.null(fit[[i]]$W) || nrow(fit[[i]]$W) < ncol(covariates[[split]])) {
+          pred_single <- sweep(features_single %*% fit[[i]]$C[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
+        } else {
+          pred_single <- as.matrix(covariates[[split]]) %*% fit[[i]]$W + sweep(features_single %*% fit[[i]]$C[active_vars, , drop = F], 2, fit[[i]]$a0, FUN = "+")
+        }
       } else {
         active_vars <- which_row_active(fit[[i]]$CC)
         if (length(active_vars) > 0) {
@@ -629,7 +633,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
                              snpnet_dir = NULL, snpnet_subdir = NULL, snpnet_prefix = NULL, snpnet_suffix = NULL,
                              save_dir = NULL, train_name = "metric_train", val_name = "metric_val", metric_name = "R2",
                              train_bin_name = "AUC_train", val_bin_name = "AUC_val", metric_bin_name = "AUC",
-                             xlim = c(NA, NA), ylim = c(NA, NA)) {
+                             xlim = c(NA, NA), ylim = c(NA, NA), mapping_phenotype = NULL) {
   if (!is.null(save_dir)) dir.create(save_dir)
   data_metric_full <- NULL
   bin_names <- c()
@@ -692,6 +696,12 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
                                  metric_val = metric_val[1:imax], type = "exact", rank = "snpnet")
 
       data_metric_full <- rbind(data_metric_full, table_snpnet)
+    }
+  }
+
+  if (!is.null(mapping_phenotype)) {
+    for (phe in names(mapping_phenotype)) {
+      data_metric_full$phenotype[data_metric_full$phenotype == phe] <- mapping_phenotype[phe]
     }
   }
 
