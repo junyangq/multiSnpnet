@@ -705,7 +705,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
     }
   }
 
-  gp <- list()
+  gp <- list(data = data_metric_full)
 
   if (!is.null(snpnet_dir)) {
     max_metric_reduced_rank <- data_metric_full %>%
@@ -721,6 +721,16 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       dplyr::mutate(absolute_change = max_multisnpnet_val - max_snpnet_val,
                     relative_change = max_multisnpnet_val/abs(max_snpnet_val)-1,
                     direction = ifelse(relative_change > 0, "P", "N"))
+    gp[["max_metric"]] <- max_metric
+    gp[["metric_cmp_abs_change"]] <- ggplot(max_metric, aes(x = phenotype, y = absolute_change)) +
+      geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
+      geom_hline(yintercept = 0, colour = "grey90") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+      xlab("phenotypes") + ylab("Metric Absolute Change (%)")
+    if (!is.null(save_dir)) {
+      save_path <- file.path(save_dir, "metric_cmp_abs_change.pdf")
+      ggsave(save_path, plot = gp[["metric_cmp_abs_change"]])
+    }
     gp[["metric_cmp_rel_change"]] <- ggplot(max_metric, aes(x = phenotype, y = relative_change*100)) +
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
@@ -729,6 +739,25 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_rel_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_rel_change"]])
+    }
+    # relative plot with absoluate value on the second y axis
+    abs_range <- range(max_metric$absolute_change)
+    rel_range <- range(max_metric$relative_change)
+    if (abs_range[1] * abs_range[2] < 0) {
+      multiplier <- min(rel_range[2] / abs_range[2], rel_range[1] / abs_range[1]) * 100
+    } else {
+      multiplier <- max(abs(rel_range)) / max(abs(abs_range)) * 100 / 2
+    }
+    gp[["metric_cmp_abs_rel_change"]] <- ggplot(max_metric, aes(x = reorder(phenotype, -relative_change), y = relative_change*100)) +
+      geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
+      geom_hline(yintercept = 0, colour = "grey90") +
+      geom_point(aes(y = absolute_change * multiplier), size = 1.5) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+      scale_y_continuous(sec.axis = sec_axis(~. * (1.0/multiplier), name = "Metric Absolute Change")) +
+      xlab("phenotypes") + ylab("Metric Relative Change (%)")
+    if (!is.null(save_dir)) {
+      save_path <- file.path(save_dir, "metric_cmp_abs_rel_change.pdf")
+      ggsave(save_path, plot = gp[["metric_cmp_abs_rel_change"]])
     }
   }
 
