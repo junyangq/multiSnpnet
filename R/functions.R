@@ -649,7 +649,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       load(latest_result, envir = myenv)
       metric_train <- myenv[[train_name]]
       metric_val <- myenv[[val_name]]
-      if (exists(train_bin_name) && exists(val_bin_name)) {
+      if ((train_bin_name %in% names(myenv)) && (val_bin_name %in% names(myenv))) {
         AUC_train <- myenv[[train_bin_name]]
         AUC_val <- myenv[[val_bin_name]]
         bin_names <- unique(c(bin_names, colnames(AUC_train)))
@@ -726,7 +726,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      xlab("phenotypes") + ylab("Metric Absolute Change (%)")
+      xlab("Phenotypes") + ylab("Metric Absolute Change (%)")
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_abs_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_abs_change"]])
@@ -735,7 +735,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      xlab("phenotypes") + ylab("Metric Relative Change (%)")
+      xlab("Phenotypes") + ylab("Metric Relative Change (%)")
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_rel_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_rel_change"]])
@@ -754,7 +754,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       geom_point(aes(y = absolute_change * multiplier), size = 1.5) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
       scale_y_continuous(sec.axis = sec_axis(~. * (1.0/multiplier), name = "Metric Absolute Change")) +
-      xlab("phenotypes") + ylab("Metric Relative Change (%)")
+      xlab("Phenotypes") + ylab("Metric Relative Change (%)")
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_abs_rel_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_abs_rel_change"]])
