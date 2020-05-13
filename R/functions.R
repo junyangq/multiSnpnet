@@ -690,7 +690,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
   }
 
   if (!is.null(snpnet_dir)) {
-    for (phe in as.character(unique(data_metric[["phenotype"]]))) {
+    for (phe in as.character(unique(data_metric_full[["phenotype"]]))) {
       print(phe)
       phe_dir <- file.path(snpnet_dir, phe, snpnet_subdir)  # results/results
       files_in_dir <- list.files(phe_dir)
@@ -724,6 +724,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
     data_metric_full$phenotype <- as.character(data_metric_full$phenotype)
     for (phe in names(mapping_phenotype)) {
       data_metric_full$phenotype[data_metric_full$phenotype == phe] <- mapping_phenotype[phe]
+      if (phe %in% bin_names) bin_names[bin_names == phe] <- mapping_phenotype[phe]
     }
   }
 
@@ -787,7 +788,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
     }
   }
 
-  for (phe in as.character(unique(data_metric[["phenotype"]]))) {
+  for (phe in as.character(unique(data_metric_full[["phenotype"]]))) {
     mname <- ifelse(phe %in% bin_names, metric_bin_name, metric_name)
     gp[[phe]] <- ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
       geom_path() + geom_point() +
