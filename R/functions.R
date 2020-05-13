@@ -651,7 +651,12 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       load(latest_result, envir = myenv)
       metric_train <- myenv[[train_name]]
       metric_val <- myenv[[val_name]]
-      if (!is.null(test_name)) metric_test <- myenv[[test_name]]
+      if (!is.null(test_name)) {
+        if (!(test_name %in% names(myenv))) {
+          stop("Test result doesn't exist for multisnpnet rank ", r, ".\n")
+        }
+        metric_test <- myenv[[test_name]]
+      }
       if ((train_bin_name %in% names(myenv)) && (val_bin_name %in% names(myenv))) {
         AUC_train <- myenv[[train_bin_name]]
         AUC_val <- myenv[[val_bin_name]]
@@ -703,6 +708,9 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       metric_train <- myenv[["metric.train"]]
       metric_val <- myenv[["metric.val"]]
       if (!is.null(test_name)) {
+        if (!("metric.test" %in% names(myenv))) {
+          stop("Test result doesn't exist for ", phe, ".\n")
+        }
         metric_test <- myenv[["metric.test"]]
         imax_test <- max(which(!is.na(metric_test)))
       }
@@ -724,8 +732,9 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
     data_metric_full$phenotype <- as.character(data_metric_full$phenotype)
     for (phe in names(mapping_phenotype)) {
       data_metric_full$phenotype[data_metric_full$phenotype == phe] <- mapping_phenotype[phe]
-      if (phe %in% bin_names) bin_names[bin_names == phe] <- mapping_phenotype[phe]
     }
+    reverse_mapping <- names(mapping_phenotype)
+    names(reverse_mapping) <- mapping_phenotype
   }
 
   gp <- list(data = data_metric_full)
@@ -789,8 +798,9 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
   }
 
   for (phe in as.character(unique(data_metric_full[["phenotype"]]))) {
-    mname <- ifelse(phe %in% bin_names, metric_bin_name, metric_name)
-    gp[[phe]] <- ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
+    fname_phe <- ifelse(!is.null(mapping_phenotype) && (phe %in% mapping_phenotype), reverse_mapping[phe], phe)
+    mname <- ifelse(fname_phe %in% bin_names, metric_bin_name, metric_name)
+    gp[[fname_phe]] <- ggplot(dplyr::filter(data_metric_full, phenotype == phe), aes(x = metric_train, y = metric_val, shape = type, colour = rank)) +
       geom_path() + geom_point() +
       xlab(paste(mname, "(train)")) + ylab(paste(mname, "(val)")) +
       xlim(as.numeric(xlim)) + ylim(as.numeric(ylim)) +
@@ -800,8 +810,8 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
             strip.text.x = element_text(size = 12), strip.text.y = element_text(size = 12)) +
       ggtitle(phe)
     if (!is.null(save_dir)) {
-      save_path <- file.path(save_dir, paste0(mname, "_plot_", phe, ".pdf"))
-      ggsave(save_path, plot = gp[[phe]])
+      save_path <- file.path(save_dir, paste0(mname, "_plot_", fname_phe, ".pdf"))
+      ggsave(save_path, plot = gp[[fname_phe]])
     }
   }
   gp
