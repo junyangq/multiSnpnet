@@ -757,12 +757,13 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       dplyr::mutate(absolute_change = max_multisnpnet_val - max_snpnet_val,
                     relative_change = max_multisnpnet_val/abs(max_snpnet_val)-1,
                     direction = ifelse(relative_change > 0, "P", "N"))
+    val_test_label <- ifelse(!is.null(test_name), "Test ", NULL)
     gp[["max_metric"]] <- max_metric
     gp[["metric_cmp_abs_change"]] <- ggplot(max_metric, aes(x = phenotype, y = absolute_change)) +
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      xlab("Phenotypes") + ylab("Metric Absolute Change")
+      xlab("Phenotype") + ylab(paste0(val_test_label, "Metric Absolute Change"))
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_abs_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_abs_change"]])
@@ -771,7 +772,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       geom_bar(stat = "identity", position = "dodge", aes(fill = direction)) +
       geom_hline(yintercept = 0, colour = "grey90") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      xlab("Phenotypes") + ylab("Metric Relative Change (%)")
+      xlab("Phenotype") + ylab(paste0(val_test_label, "Metric Relative Change (%)"))
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_rel_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_rel_change"]])
@@ -789,8 +790,8 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       geom_hline(yintercept = 0, colour = "grey90") +
       geom_point(aes(y = absolute_change * multiplier), size = 1.5) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-      scale_y_continuous(sec.axis = sec_axis(~. * (1.0/multiplier), name = "Metric Absolute Change")) +
-      xlab("Phenotypes") + ylab("Metric Relative Change (%)")
+      scale_y_continuous(sec.axis = sec_axis(~. * (1.0/multiplier), name = paste0(val_test_label, "Metric Absolute Change"))) +
+      xlab("Phenotype") + ylab(paste0(val_test_label, "Metric Relative Change (%)"))
     if (!is.null(save_dir)) {
       save_path <- file.path(save_dir, "metric_cmp_abs_rel_change.pdf")
       ggsave(save_path, plot = gp[["metric_cmp_abs_rel_change"]])
@@ -814,6 +815,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
       ggsave(save_path, plot = gp[[fname_phe]])
     }
   }
+
   gp
 }
 
