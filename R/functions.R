@@ -822,14 +822,12 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
 safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 4) {
   ncol.chunk <- floor(MAXLEN / as.double(nrow(X)))  # depends on the memory requirements
   numChunks <- ceiling(ncol(X) / as.double(ncol.chunk))
-  for (jc in 1:numChunks) {
-    # print(jc)
+  out <- matrix(0, nrow(X), ncol(Y))
+  rownames(out) <- rownames(X)
+  colnames(out) <- colnames(Y)
+  for (jc in seq_len(numChunks)) {
     idx <- ((jc-1)*ncol.chunk+1):min(jc*ncol.chunk, ncol(X))
-    if (jc == 1) {
-      out <- X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
-    } else {
-      out <- out + X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
-    }
+    out <- out + X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
   }
   out
 }
