@@ -1,6 +1,6 @@
 ---
-title: "Snpnet Vignette"
-author: "Junyang Qian, Yosuke Tanigawa, and Trevor Hastie"
+title: "multisnpnet Vignette"
+author: "Junyang Qian, Yosuke Tanigawa, Manuel A. Rivas, and Trevor Hastie"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -52,7 +52,7 @@ fit_multisnpnet <- multisnpnet(
 
 ### Example of Biplot Visualization
 
-The coefficent matrix $C$ in the returned value from `multisnpnet::multisnpnet()` has the dimension of $p \timex q$. One can visualize this matrix with a biplot visualization.
+The coefficent matrix $C$ in the returned value from `multisnpnet::multisnpnet()` has the dimension of $p \times q$. One can visualize this matrix with a biplot visualization.
 
 ```{r}
 plot_biplot(
