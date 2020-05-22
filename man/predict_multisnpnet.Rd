@@ -4,17 +4,10 @@
 \alias{predict_multisnpnet}
 \title{Predict from the Fitted Object or File}
 \usage{
-predict_multisnpnet(
-  fit = NULL,
-  saved_path = NULL,
-  new_genotype_file,
-  new_phenotype_file,
-  idx = NULL,
-  covariate_names = NULL,
-  split_col = NULL,
-  split_name = NULL,
-  zstdcat_path = "zstdcat"
-)
+predict_multisnpnet(fit = NULL, saved_path = NULL, new_genotype_file,
+  new_phenotype_file, idx = NULL, covariate_names = NULL,
+  split_col = NULL, split_name = NULL, binary_phenotypes = NULL,
+  zstdcat_path = "zstdcat")
 }
 \arguments{
 \item{fit}{List of fit object returned from multisnpnet.}

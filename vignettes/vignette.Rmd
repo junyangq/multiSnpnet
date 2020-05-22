@@ -1,0 +1,89 @@
+---
+title: "multisnpnet Vignette"
+author: "Junyang Qian, Yosuke Tanigawa, Manuel A. Rivas, and Trevor Hastie"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+### Introduction
+
+### A Simple Example
+
+```{r}
+library(multisnpnet)
+```
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+fit_multisnpnet <- multisnpnet(
+    genotype_file = genotype_file,
+    phenotype_file = phenotype_file,
+    phenotype_names = phenotype_names,
+    covariate_names = covariate_names,
+    #   results_dir = results_dir,
+    rank = r,
+    batch_size = batch_size,
+    split_col = split.col,
+    max.iter = max.iter,
+#      thresh = thresh,
+    configs = configs,
+    lambda.min.ratio = lambda.min.ratio,
+    nlambda = nlambda,
+    standardize_response = standardize_response,
+    save = save,
+    validation = validation,
+    prev_iter = prev_iter,
+    early_stopping = early_stopping,
+    # glmnet_thresh = thresh,
+    weight = weight,
+    mem = mem
+)
+```
+
+### Example of Biplot Visualization
+
+The coefficent matrix $C$ in the returned value from `multisnpnet::multisnpnet()` has the dimension of $p \times q$. One can visualize this matrix with a biplot visualization.
+
+```{r}
+plot_biplot(
+    svd(t(fit_multisnpnet$C)),
+    label=list(
+        'phenotype'=rownames(A_init), # we should update this phenotype labels so that it matches with the simple example above.
+        'variants'=rownames(fit$C)
+    )
+)
+```
+
+By default, this function annotates 5 phenotypes and 5 variants based on the distance from the center of origin. One can annotate more points by specifying `n_labels` option.
+
+Alternatively, you can generate an interactive plot with `plotly` with mouseover annotation of phenotypes and variants. In that case, you need to disable the static annotation by specifying `use_ggrepel=FALSE`.
+
+```{r}
+if (!require('plotly', character.only = TRUE)) {
+    install.packages('plotly', dependencies = TRUE)
+    library('plotly', character.only = TRUE)
+}
+
+plot_biplot(
+    svd(t(fit_multisnpnet$C)),
+    label=list(
+        'phenotype'=rownames(A_init), # we should update this phenotype labels so that it matches with the simple example above.
+        'variants'=rownames(fit$C)
+    ),
+    use_ggrepel=FALSE
+) %>%
+plotly::ggplotly() %>%
+htmlwidgets::saveWidget('multisnpnet.biplot.html', selfcontained = F, libdir = "lib")
+```
+
+You can open the resulting html file (`multisnpnet.biplot.html`) with your favorite browser.

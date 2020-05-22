@@ -846,3 +846,143 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 4) {
   }
   out
 }
+
+#' Make biplots of the multisnpnet results
+#'
+#' Generate biplot visualization based on the decomposed coefficient matrix C.
+#' One of the most common use case is: plot_biplot(svd(t(fit$C)), label=list('phenotype'=rownames(A_init), 'variant'=rownames(fit$C)))
+#'
+#' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)).
+#'   Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.
+#' @param component A named list that specifies the index of the components used in the plot.
+#' @param label A named list that specifies the phenotype and variant labels.
+#'   The labels needs to be the same order as in svd_obj$u and svd_obj$v.
+#' @param n_labels A named list that specifies the number of phenotype and variant labels in the plot.
+#' @param color A named list that specifies the color in the plot.
+#' @param shape A named list that specifies the color in the plot.
+#' @param axis_label A named list that specifies the names used in the axis labels.
+#' @param use_ggrepel A binary variable that specifies whether we should use ggrepel to annotate the
+#'   labels of the data points.
+#'
+#' @import ggplot2
+#' @importFrom magrittr '%>%'
+#' @importFrom tibble rownames_to_column
+#' @importFrom dplyr rename select mutate if_else bind_rows
+#'
+#' @export
+plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
+                        label=list('phenotype'=NULL, 'variant'=NULL),
+                        n_labels=list('phenotype'=5, 'variant'=5),
+                        color=list('phenotype'='red', 'variant'='blue'),
+                        shape=list('phenotype'=20, 'variant'=4),
+                        axis_label=list('main'='variant', 'sub'='phenotype'),
+                        use_ggrepel=TRUE) {
+    # extract the relevant matrices from the svd object
+    u  <- svd_obj$u
+    vd <- (svd_obj$v) %*% (diag(svd_obj$d))
+
+    # assign row and col names
+    if(is.null(label[['phenotype']])){ label[['phenotype']] <- paste0('phenotype', 1:nrow(u)) }
+    if(is.null(label[['variant']])){   label[['variant']]   <- paste0('variant',   1:nrow(vd)) }
+    rownames(u)  <- label[['phenotype']]
+    rownames(vd) <- label[['variant']]
+    colnames(u)  <- 1:length(svd_obj$d)
+    colnames(vd) <- 1:length(svd_obj$d)
+
+    # convert the matrices into data frames
+    df_u  <- u  %>% as.data.frame() %>% rename('PC_x' := component$x, 'PC_y' := component$y) %>%
+    select(PC_x, PC_y) %>% rownames_to_column('label') %>%
+    mutate(label = if_else(rank(-(PC_x**2+PC_y**2))<=n_labels[['phenotype']], label, ''))
+    
+    df_vd <- vd %>% as.data.frame() %>% rename('PC_x' := component$x, 'PC_y' := component$y) %>%
+    select(PC_x, PC_y) %>% rownames_to_column('label') %>%
+    mutate(label = if_else(rank(-(PC_x**2+PC_y**2))<=n_labels[['variant']], label, ''))
+
+    # scale u (data on sub-axis) to map to the main-axis
+    lim_u_abs   <- 1.1 * max(abs(df_u  %>% select(PC_x, PC_y)))
+    lim_vd_abs  <- 1.1 * max(abs(df_vd %>% select(PC_x, PC_y)))
+
+    df_u_scaled <- df_u %>%
+    mutate(
+        PC_x = PC_x * (lim_vd_abs/lim_u_abs),
+        PC_y = PC_y * (lim_vd_abs/lim_u_abs)
+    )
+    
+    if(! use_ggrepel){
+      # generate plot without ggrepel. This is useful when you'd like 
+      # to conver the plot into plotly object using gplotly.
+        p <- ggplot() +
+        layer(
+          # scatter plot for (VD)
+            data=df_vd, mapping=aes(x=PC_x, y=PC_y, shape='variant', label=label),
+            geom='point', stat = "identity", position = "identity",
+            params=list(size=1, color=color[['variant']])
+        )+
+        layer(
+          # segments (lines) for U
+            data=df_u_scaled, 
+            mapping=aes(x=0, y=0, xend=PC_x, yend=PC_y),
+            geom='segment', stat = "identity", position = "identity",
+            params=list(size=1, color=color[['phenotype']], alpha=.2)
+        )+
+        layer(
+          # scatter plot for U
+            data=df_u_scaled, 
+            mapping=aes(x=PC_x, y=PC_y, shape='phenotype', label=label),
+            geom='point', stat = "identity", position = "identity",
+            params=list(size=1, color=color[['phenotype']])
+        )
+        
+    } else { # use_ggrepel == TRUE
+      # generate the plot with ggrepel
+        p <- ggplot() +
+        layer(
+            data=df_vd, mapping=aes(x=PC_x, y=PC_y, shape='variant'),
+            geom='point', stat = "identity", position = "identity",
+            params=list(size=1, color=color[['variant']])
+        )+
+        layer(
+            data=df_u_scaled, 
+            mapping=aes(x=0, y=0, xend=PC_x, yend=PC_y),
+            geom='segment', stat = "identity", position = "identity",
+            params=list(size=1, color=color[['phenotype']], alpha=.2)
+        )+
+        layer(
+            data=df_u_scaled, 
+            mapping=aes(x=PC_x, y=PC_y, shape='phenotype'),
+            geom='point', stat = "identity", position = "identity",
+            params=list(size=1, color=color[['phenotype']])
+        )+
+        ggrepel::geom_text_repel(
+            data=bind_rows(
+                df_u_scaled %>% mutate(color=color[['phenotype']]),
+                df_vd       %>% mutate(color=color[['variant']])
+            ), 
+            mapping=aes(x=PC_x, y=PC_y, label=label, color=color),
+            size=3, force=10
+        )   
+    }
+
+    # configure the theme, axis, and axis labels
+    p + theme_bw() +
+    scale_color_manual(values=setNames(color, color)) +
+    scale_shape_manual(values=shape) +
+    guides(shape=FALSE,color=FALSE) + 
+    scale_x_continuous(
+        sprintf('Component %s (%s [%s])', component$x, axis_label[['main']], color[['variant']]),
+        limits = c(-lim_vd_abs, lim_vd_abs),
+        sec.axis = sec_axis(
+            ~ . * (lim_u_abs/lim_vd_abs), 
+            name = sprintf('Component %s (%s [%s])', component$y, axis_label[['sub']], color[['phenotype']])
+        )
+    ) +
+    scale_y_continuous(
+        sprintf('Component %s (%s [%s])', component$x, axis_label[['main']], color[['variant']]),
+        limits = c(-lim_vd_abs, lim_vd_abs),
+        sec.axis = sec_axis(
+            ~ . * (lim_u_abs/lim_vd_abs),
+            name = sprintf('Component %s (%s [%s])', component$y, axis_label[['sub']], color[['phenotype']])
+        )
+    )
+}
