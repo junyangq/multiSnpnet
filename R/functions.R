@@ -487,6 +487,11 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
       }
     }
   }
+
+  if ("train" %in% split_name) {
+    split_name <- c("train", setdiff(split_name, "train"))
+  }
+
   for (split in split_name) {
     ids[[split]] <- ids[[split]][!is.na(ids[[split]])]
   }
@@ -556,6 +561,7 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   }
 
   for (i in seq_along(fit)) {
+    if (length(binary_phenotypes) > 0 && "train" %in% split_name) glmfit_bin <- list()
     for (split in split_name) {
       if (!is.null(covariates[[split]]) && !is_full_rank) {
         active_vars <- which_row_active(fit[[i]]$C)
@@ -582,17 +588,26 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
       }
       pred_single <- as.matrix(pred_single)
       colnames(pred_single) <- colnames(fit[[i]]$C)
-      pred_single <- y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight)
-      pred[[split]][, , i] <- as.matrix(pred_single)
-      R2[[split]][, i] <- 1 - apply((pred[[split]][, , i] - response[[split]])^2, 2, mean, na.rm = T) / variance[[split]]
+      pred_single <- as.matrix(y_de_standardization(pred_single, std_obj$means, std_obj$sds, weight))
+      R2[[split]][, i] <- 1 - apply((pred_single - response[[split]])^2, 2, mean, na.rm = T) / variance[[split]]
       if (length(binary_phenotypes) > 0) {
         for (bphe in binary_phenotypes) {
+          if ("train" %in% split_name) {
+            if (split == "train") {
+              data_logistic_train <- data.frame(response = response[[split]][, bphe], covariates[[split]], score = pred_single[, bphe])
+              glmfit_bin[[bphe]] <- glm(response ~ ., data = data_logistic_train, family = binomial())
+            }
+            data_logistic_split <- data.frame(covariates[[split]], score = pred_single[, bphe])
+            pred_prob_split <- predict(glmfit_bin[[bphe]], newdata = data_logistic_split, type = "response")
+            pred_single[, bphe] <- pred_prob_split
+          }
           not_missing <- !is.na(response[[split]][, bphe])
           pred_obj <- ROCR::prediction(pred_single[not_missing, bphe], response[[split]][not_missing, bphe])
           auc_obj <- ROCR::performance(pred_obj, measure = 'auc')
           AUC[[split]][bphe, i] <- auc_obj@y.values[[1]]
         }
       }
+      pred[[split]][, , i] <- pred_single
     }
   }
 
