@@ -415,6 +415,10 @@ coef_multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
 #' @param covariate_names Character vector of the names of the adjustment covariates.
 #' @param split_col Name of the split column. If NULL, all samples will be used.
 #' @param split_name Vector of split labels where prediction is to be made.
+#' @param binary_phenotypes Vector of names of the binary phenotypes. If training split is provided,
+#'   logistic regression will be refitted on the covariates and linear prediction score (from
+#'   multivariate fit) and the final prediction updated. In addition, AUC will be computed for
+#'   binary phenotypes.
 #' @param zstdcat_path Path to zstdcat program, needed when loading variants
 #'
 #' @return A list containing the prediction and the resopnse for which the prediction is made.
@@ -894,7 +898,7 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
     df_u  <- u  %>% as.data.frame() %>% rename('PC_x' := component$x, 'PC_y' := component$y) %>%
     select(PC_x, PC_y) %>% rownames_to_column('label') %>%
     mutate(label = if_else(rank(-(PC_x**2+PC_y**2))<=n_labels[['phenotype']], label, ''))
-    
+
     df_vd <- vd %>% as.data.frame() %>% rename('PC_x' := component$x, 'PC_y' := component$y) %>%
     select(PC_x, PC_y) %>% rownames_to_column('label') %>%
     mutate(label = if_else(rank(-(PC_x**2+PC_y**2))<=n_labels[['variant']], label, ''))
@@ -908,9 +912,9 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
         PC_x = PC_x * (lim_vd_abs/lim_u_abs),
         PC_y = PC_y * (lim_vd_abs/lim_u_abs)
     )
-    
+
     if(! use_ggrepel){
-      # generate plot without ggrepel. This is useful when you'd like 
+      # generate plot without ggrepel. This is useful when you'd like
       # to conver the plot into plotly object using gplotly.
         p <- ggplot() +
         layer(
@@ -921,19 +925,19 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
         )+
         layer(
           # segments (lines) for U
-            data=df_u_scaled, 
+            data=df_u_scaled,
             mapping=aes(x=0, y=0, xend=PC_x, yend=PC_y),
             geom='segment', stat = "identity", position = "identity",
             params=list(size=1, color=color[['phenotype']], alpha=.2)
         )+
         layer(
           # scatter plot for U
-            data=df_u_scaled, 
+            data=df_u_scaled,
             mapping=aes(x=PC_x, y=PC_y, shape='phenotype', label=label),
             geom='point', stat = "identity", position = "identity",
             params=list(size=1, color=color[['phenotype']])
         )
-        
+
     } else { # use_ggrepel == TRUE
       # generate the plot with ggrepel
         p <- ggplot() +
@@ -943,13 +947,13 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
             params=list(size=1, color=color[['variant']])
         )+
         layer(
-            data=df_u_scaled, 
+            data=df_u_scaled,
             mapping=aes(x=0, y=0, xend=PC_x, yend=PC_y),
             geom='segment', stat = "identity", position = "identity",
             params=list(size=1, color=color[['phenotype']], alpha=.2)
         )+
         layer(
-            data=df_u_scaled, 
+            data=df_u_scaled,
             mapping=aes(x=PC_x, y=PC_y, shape='phenotype'),
             geom='point', stat = "identity", position = "identity",
             params=list(size=1, color=color[['phenotype']])
@@ -958,22 +962,22 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
             data=bind_rows(
                 df_u_scaled %>% mutate(color=color[['phenotype']]),
                 df_vd       %>% mutate(color=color[['variant']])
-            ), 
+            ),
             mapping=aes(x=PC_x, y=PC_y, label=label, color=color),
             size=3, force=10
-        )   
+        )
     }
 
     # configure the theme, axis, and axis labels
     p + theme_bw() +
     scale_color_manual(values=setNames(color, color)) +
     scale_shape_manual(values=shape) +
-    guides(shape=FALSE,color=FALSE) + 
+    guides(shape=FALSE,color=FALSE) +
     scale_x_continuous(
         sprintf('Component %s (%s [%s])', component$x, axis_label[['main']], color[['variant']]),
         limits = c(-lim_vd_abs, lim_vd_abs),
         sec.axis = sec_axis(
-            ~ . * (lim_u_abs/lim_vd_abs), 
+            ~ . * (lim_u_abs/lim_vd_abs),
             name = sprintf('Component %s (%s [%s])', component$y, axis_label[['sub']], color[['phenotype']])
         )
     ) +
