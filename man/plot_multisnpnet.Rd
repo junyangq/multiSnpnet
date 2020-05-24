@@ -4,14 +4,30 @@
 \alias{plot_multisnpnet}
 \title{Make plots of the multisnpnet results}
 \usage{
-plot_multisnpnet(results_dir, rank_prefix, type, rank, file_prefix,
-  file_suffix, snpnet_dir = NULL, snpnet_subdir = NULL,
-  snpnet_prefix = NULL, snpnet_suffix = NULL, save_dir = NULL,
-  train_name = "metric_train", val_name = "metric_val",
-  test_name = NULL, metric_name = "R2", train_bin_name = "AUC_train",
-  val_bin_name = "AUC_val", test_bin_name = "AUC_test",
-  metric_bin_name = "AUC", xlim = c(NA, NA), ylim = c(NA, NA),
-  mapping_phenotype = NULL)
+plot_multisnpnet(
+  results_dir,
+  rank_prefix,
+  type,
+  rank,
+  file_prefix,
+  file_suffix,
+  snpnet_dir = NULL,
+  snpnet_subdir = NULL,
+  snpnet_prefix = NULL,
+  snpnet_suffix = NULL,
+  save_dir = NULL,
+  train_name = "metric_train",
+  val_name = "metric_val",
+  test_name = NULL,
+  metric_name = "R2",
+  train_bin_name = "AUC_train",
+  val_bin_name = "AUC_val",
+  test_bin_name = "AUC_test",
+  metric_bin_name = "AUC",
+  xlim = c(NA, NA),
+  ylim = c(NA, NA),
+  mapping_phenotype = NULL
+)
 }
 \arguments{
 \item{results_dir}{Character vector each specifies the parent directory of one type (e.g. exact,
@@ -36,13 +52,11 @@ in}
 \item{save_dir}{Directory to save the plots. If NULL, no plots are generated but the list of plot
 objects is returned}
 
-\item{train_name}{Name of the object storing the training metric}
+\item{train_name}{Name of the object storing the validation metric}
 
 \item{xlim}{The x limits (x1, x2) of the plots}
 
 \item{ylim}{The y limits (y1, y2) of the plots}
-
-\item{train_name}{Name of the object storing the validation metric}
 }
 \description{
 For 50th lambda, the reduced-rank results are saved at

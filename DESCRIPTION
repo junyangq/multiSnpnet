@@ -1,4 +1,4 @@
-Package: multisnpnet
+Package: multiSnpnet
 Type: Package
 Title: Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses
 Version: 0.1.0

@@ -4,10 +4,18 @@
 \alias{predict_multisnpnet}
 \title{Predict from the Fitted Object or File}
 \usage{
-predict_multisnpnet(fit = NULL, saved_path = NULL, new_genotype_file,
-  new_phenotype_file, idx = NULL, covariate_names = NULL,
-  split_col = NULL, split_name = NULL, binary_phenotypes = NULL,
-  zstdcat_path = "zstdcat")
+predict_multisnpnet(
+  fit = NULL,
+  saved_path = NULL,
+  new_genotype_file,
+  new_phenotype_file,
+  idx = NULL,
+  covariate_names = NULL,
+  split_col = NULL,
+  split_name = NULL,
+  binary_phenotypes = NULL,
+  zstdcat_path = "zstdcat"
+)
 }
 \arguments{
 \item{fit}{List of fit object returned from multisnpnet.}
@@ -26,6 +34,11 @@ must exist.}
 \item{split_col}{Name of the split column. If NULL, all samples will be used.}
 
 \item{split_name}{Vector of split labels where prediction is to be made.}
+
+\item{binary_phenotypes}{Vector of names of the binary phenotypes. If training split is provided,
+logistic regression will be refitted on the covariates and linear prediction score (from
+multivariate fit) and the final prediction updated. In addition, AUC will be computed for
+binary phenotypes.}
 
 \item{zstdcat_path}{Path to zstdcat program, needed when loading variants}
 }

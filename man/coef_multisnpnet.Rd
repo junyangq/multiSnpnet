@@ -4,8 +4,7 @@
 \alias{coef_multisnpnet}
 \title{Extract Coefficients from the Fitted Object or File}
 \usage{
-coef_multisnpnet(fit = NULL, fit_path = NULL, idx = NULL,
-  uv = TRUE)
+coef_multisnpnet(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
 }
 \arguments{
 \item{fit}{Fit object returned from multisnpnet}

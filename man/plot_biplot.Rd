@@ -4,12 +4,16 @@
 \alias{plot_biplot}
 \title{Make biplots of the multisnpnet results}
 \usage{
-plot_biplot(svd_obj, component = list(x = 1, y = 2),
+plot_biplot(
+  svd_obj,
+  component = list(x = 1, y = 2),
   label = list(phenotype = NULL, variant = NULL),
-  n_labels = list(phenotype = 5, variant = 5), color = list(phenotype =
-  "red", variant = "blue"), shape = list(phenotype = 20, variant = 4),
+  n_labels = list(phenotype = 5, variant = 5),
+  color = list(phenotype = "red", variant = "blue"),
+  shape = list(phenotype = 20, variant = 4),
   axis_label = list(main = "variant", sub = "phenotype"),
-  use_ggrepel = TRUE)
+  use_ggrepel = TRUE
+)
 }
 \arguments{
 \item{svd_obj}{A named list containing three matrices with u, d, and v as their names as in the
