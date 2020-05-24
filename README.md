@@ -20,10 +20,10 @@ We assume the users already have PLINK 2.0. Otherwise it can be installed from h
 For description of the arguments, see the function documentation (e.g. by `?multisnpnet`).
 
 ```r
-library(multisnpnet)
+library(multiSnpnet)
 
-genotype_file <- file.path(system.file("extdata", package = "multisnpnet"), "sample")
-phenotype_file <- system.file("extdata", "sample.phe", package = "multisnpnet")
+genotype_file <- file.path(system.file("extdata", package = "multiSnpnet"), "sample")
+phenotype_file <- system.file("extdata", "sample.phe", package = "multiSnpnet")
 
 phenotype_names <- c("QPHE", "BPHE")
 covariate_names <- c("age", "sex", paste0("PC", 1:10))
