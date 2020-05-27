@@ -838,7 +838,7 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
   gp
 }
 
-safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 4) {
+safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2) {
   ncol.chunk <- floor(MAXLEN / as.double(nrow(X)))  # depends on the memory requirements
   numChunks <- ceiling(ncol(X) / as.double(ncol.chunk))
   out <- matrix(0, nrow(X), ncol(Y))

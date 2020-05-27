@@ -269,12 +269,12 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     }
 
     if (rank == ncol(response_train)) {
-      pred_train_0 <- sweep(as.matrix(features_train) %*% fit$CC, 2, fit$a0, FUN = "+")
+      pred_train_0 <- sweep(safe_product(as.matrix(features_train), fit$CC), 2, fit$a0, FUN = "+")
     } else {
       if (!is.null(covariates_train)) {
-        pred_train_0 <- sweep(as.matrix(covariates_train) %*% fit$W + as.matrix(features_train) %*% fit$C, 2, fit$a0, FUN = "+")
+        pred_train_0 <- sweep(safe_product(as.matrix(covariates_train), fit$W) + safe_product(as.matrix(features_train), fit$C), 2, fit$a0, FUN = "+")
       } else {
-        pred_train_0 <- sweep(as.matrix(features_train) %*% fit$C, 2, fit$a0, FUN = "+")
+        pred_train_0 <- sweep(safe_product(as.matrix(features_train), fit$C), 2, fit$a0, FUN = "+")
       }
     }
     response_train[missing_response_train] <- pred_train_0[missing_response_train]
@@ -392,12 +392,12 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
 
     if (validation) {
       if (rank == ncol(response_train)) {
-        pred_val <- sweep(as.matrix(features_val) %*% fit$CC, 2, fit$a0, FUN = "+")
+        pred_val <- sweep(safe_product(as.matrix(features_val), fit$CC), 2, fit$a0, FUN = "+")
       } else {
         if (!is.null(covariates_val)) {
-          pred_val <- sweep(as.matrix(covariates_val) %*% fit$W + as.matrix(features_val) %*% fit$C, 2, fit$a0, FUN = "+")
+          pred_val <- sweep(safe_product(as.matrix(covariates_val), fit$W) + safe_product(as.matrix(features_val), fit$C), 2, fit$a0, FUN = "+")
         } else {
-          pred_val <- sweep(as.matrix(features_val) %*% fit$C, 2, fit$a0, FUN = "+")
+          pred_val <- sweep(safe_product(as.matrix(features_val), fit$C), 2, fit$a0, FUN = "+")
         }
       }
       if (standardize_response) pred_val <- y_de_standardization(pred_val, std_obj$means, std_obj$sds, weight)
