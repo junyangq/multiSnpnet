@@ -43,9 +43,13 @@
 #'                \item{glmnet.thresh}{convergence threshold for glmnet(Plus) (default: 1E-7)}
 #'                \item{plink2.path}{path to the PLINK2.0 program, if not on the system path}
 #'                \item{zstdcat.path}{path to the zstdcat program, if not on the system path}
+#'                \item{use_safe}{whether to use safe product to deal with very large matrix
+#'                                multiplication (default: TRUE). One may also specify MAXLEN
+#'                                (default: (2^31-1)/2), the maximum vector length passed to
+#'                                the R base matrix multiplication operation}
 #'                }
 #' @param save Boolean. Whether to save intermediate results.
-#' @param early_stopping. Whether to stop the process early if validation metric starts to fall.
+#' @param early_stopping Whether to stop the process early if validation metric starts to fall.
 #'
 #' @importFrom data.table ':='
 #' @importFrom magrittr '%>%'
@@ -269,12 +273,12 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     }
 
     if (rank == ncol(response_train)) {
-      pred_train_0 <- sweep(safe_product(as.matrix(features_train), fit$CC), 2, fit$a0, FUN = "+")
+      pred_train_0 <- sweep(safe_product(as.matrix(features_train), fit$CC, configs[["MAXLEN"]], configs[["use_safe"]]), 2, fit$a0, FUN = "+")
     } else {
       if (!is.null(covariates_train)) {
-        pred_train_0 <- sweep(safe_product(as.matrix(covariates_train), fit$W) + safe_product(as.matrix(features_train), fit$C), 2, fit$a0, FUN = "+")
+        pred_train_0 <- sweep(safe_product(as.matrix(covariates_train), fit$W, configs[["MAXLEN"]], configs[["use_safe"]]) + safe_product(as.matrix(features_train), fit$C, configs[["MAXLEN"]], configs[["use_safe"]]), 2, fit$a0, FUN = "+")
       } else {
-        pred_train_0 <- sweep(safe_product(as.matrix(features_train), fit$C), 2, fit$a0, FUN = "+")
+        pred_train_0 <- sweep(safe_product(as.matrix(features_train), fit$C, configs[["MAXLEN"]], configs[["use_safe"]]), 2, fit$a0, FUN = "+")
       }
     }
     response_train[missing_response_train] <- pred_train_0[missing_response_train]
@@ -392,12 +396,12 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
 
     if (validation) {
       if (rank == ncol(response_train)) {
-        pred_val <- sweep(safe_product(as.matrix(features_val), fit$CC), 2, fit$a0, FUN = "+")
+        pred_val <- sweep(safe_product(as.matrix(features_val), fit$CC, configs[["MAXLEN"]], configs[["use_safe"]]), 2, fit$a0, FUN = "+")
       } else {
         if (!is.null(covariates_val)) {
-          pred_val <- sweep(safe_product(as.matrix(covariates_val), fit$W) + safe_product(as.matrix(features_val), fit$C), 2, fit$a0, FUN = "+")
+          pred_val <- sweep(safe_product(as.matrix(covariates_val), fit$W, configs[["MAXLEN"]], configs[["use_safe"]]) + safe_product(as.matrix(features_val), fit$C, configs[["MAXLEN"]], configs[["use_safe"]]), 2, fit$a0, FUN = "+")
         } else {
-          pred_val <- sweep(safe_product(as.matrix(features_val), fit$C), 2, fit$a0, FUN = "+")
+          pred_val <- sweep(safe_product(as.matrix(features_val), fit$C, configs[["MAXLEN"]], configs[["use_safe"]]), 2, fit$a0, FUN = "+")
         }
       }
       if (standardize_response) pred_val <- y_de_standardization(pred_val, std_obj$means, std_obj$sds, weight)

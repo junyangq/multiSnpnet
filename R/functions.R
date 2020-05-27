@@ -35,7 +35,9 @@ setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_
     rank = TRUE,
     is.warm.start = TRUE,
     is.A.converge = TRUE,
-    thresh = 1e-7
+    thresh = 1e-7,
+    MAXLEN = (2^31 - 1) / 2,
+    use_safe = TRUE
   )
   for (name in setdiff(names(out.args), "configs")) {
     configs[[name]] <- out.args[[name]]
@@ -838,15 +840,19 @@ plot_multisnpnet <- function(results_dir, rank_prefix, type, rank,
   gp
 }
 
-safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2) {
-  ncol.chunk <- floor(MAXLEN / as.double(nrow(X)))  # depends on the memory requirements
-  numChunks <- ceiling(ncol(X) / as.double(ncol.chunk))
-  out <- matrix(0, nrow(X), ncol(Y))
-  rownames(out) <- rownames(X)
-  colnames(out) <- colnames(Y)
-  for (jc in seq_len(numChunks)) {
-    idx <- ((jc-1)*ncol.chunk+1):min(jc*ncol.chunk, ncol(X))
-    out <- out + X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
+safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
+  if (use_safe) {
+    ncol.chunk <- floor(MAXLEN / as.double(nrow(X)))  # depends on the memory requirements
+    numChunks <- ceiling(ncol(X) / as.double(ncol.chunk))
+    out <- matrix(0, nrow(X), ncol(Y))
+    rownames(out) <- rownames(X)
+    colnames(out) <- colnames(Y)
+    for (jc in seq_len(numChunks)) {
+      idx <- ((jc-1)*ncol.chunk+1):min(jc*ncol.chunk, ncol(X))
+      out <- out + X[, idx, drop=FALSE] %*% Y[idx, , drop=FALSE]
+    }
+  } else {
+    out <- X %*% Y
   }
   out
 }

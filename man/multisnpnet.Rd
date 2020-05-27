@@ -59,11 +59,15 @@ computation).}
 \item{glmnet.thresh}{convergence threshold for glmnet(Plus) (default: 1E-7)}
 \item{plink2.path}{path to the PLINK2.0 program, if not on the system path}
 \item{zstdcat.path}{path to the zstdcat program, if not on the system path}
+\item{use_safe}{whether to use safe product to deal with very large matrix
+                multiplication (default: TRUE). One may also specify MAXLEN
+                (default: (2^31-1)/2), the maximum vector length passed to
+                the R base matrix multiplication operation}
 }}
 
 \item{save}{Boolean. Whether to save intermediate results.}
 
-\item{early_stopping.}{Whether to stop the process early if validation metric starts to fall.}
+\item{early_stopping}{Whether to stop the process early if validation metric starts to fall.}
 }
 \description{
 Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses
