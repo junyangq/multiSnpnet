@@ -58,7 +58,7 @@
 multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = NULL, covariate_names,
                         rank, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), standardize_response = TRUE,
                         weight = NULL, p.factor = NULL, validation = FALSE, split_col = NULL, mem = NULL,
-                        batch_size = 100, prev_iter = 0, max.iter = 10, configs = NULL, save = TRUE,
+                        batch_size = 100, prev_iter = 0, max.iter = 10, configs = list(), save = TRUE,
                         early_stopping = FALSE) {
 
   configs <- setupMultiConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names,

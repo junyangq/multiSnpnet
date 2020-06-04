@@ -1,5 +1,5 @@
 ---
-title: "multisnpnet Vignette"
+title: "MultiSnpnet Vignette"
 author: "Junyang Qian, Yosuke Tanigawa, Manuel A. Rivas, and Trevor Hastie"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
@@ -18,49 +18,121 @@ knitr::opts_chunk$set(
 
 ### Introduction
 
+**multiSnpnet** is a package that is used to fit sparse reduced rank regression for multiple responses on big genomics data. It optimizes the following objective function:
+$$
+\begin{align}
+\text{minimize} & \quad  \frac{1}{2} \|\mathcal{P}_\Omega(\mathbf{Y})-\mathcal{P}_\Omega(\mathbf{X}\mathbf{UV}^\top)\|_F^2 + \lambda \|\mathbf{U}\|_{1,2}, \\
+\text{s.t.} & \quad \mathbf{V}^\top \mathbf{V} = \mathbf{I},
+\end{align}
+$$
+where $\mathcal{P}_\Omega$ is a projection operator for missing values in $\mathbf{Y}$, i.e. $\mathcal{P}_\Omega(\mathbf{Y})_{ij} = \mathbf{Y}_{ij}$ if $\mathbf{Y}_{ij}$ is not missing and $0$ otherwise, and $\|\mathbf{U}\|_{1,2} = \sum_{j=1}^p \|\mathbf{U}_{j\cdot}\|_2$.
+
+We assume the data are stored in .pgen/.pvar/.psam format by the [PLINK library](https://www.cog-genomics.org/plink/2.0/formats#pgen). The potential training/validation split can be specified with a separate column in the phenotype file.
+
+The most essential parameters in the core function `multisnpnet` include:
+
+- `genotype_file`: the PLINK 2.0 pgen file that contains genotype. We assume the existence of genotype_file.{pgen,pvar.zst,psam}.
+- `phenotype_file`: the path of the file that contains the phenotype values and can be read as a table.
+- `phenotype_names`: names of the phenotype. Must be consistent with the column names in the phenotype file.
+- `covariate_names`: a character vector containing the names of the covariates included in the fitting, whose coefficients will not be penalized. The names must exist in the column names of the phenotype file.
+- `rank`: target rank of the reduced rank model.
+- `validation`: whether to evaluate the model performance on the validation set.
+- `split_col`: the column name in the phenotype file that specifies the membership of individuals to the training or the validation set. The individuals marked as `"train"` and `"val"` will be treated as the training and validation set, respectively. When specified, the model performance is evaluated on both the training and the validation sets.
+- `mem`: Memory (MB) available for the program. It tells PLINK 2.0 the amount of memory it can harness for the computation. IMPORTANT if using a job scheduler.
+- `batch_size`: the number of variants used in each batch screening and should be chosen based on the problem size and memory available. Default is 100.
+- `save`: a boolean indicating whether to save intermediate results.
+
+- `configs`: a list of additional configuration parameters. It can include:
+    + `results.dir`: path to the directory holding intermediate results, if `save = TRUE`.
+    + `nCores`: number of cores used for computation.
+
+Some additional important parameters for model building include:
+
+- `nlambda`: the number of lambda values on the solution path.
+- `lambda.min.ratio`: the ratio of the minimum lambda considered versus the maximum lambda that makes all penalized coefficients zero.
+- `standardize_response`: whether to standardize the responses before fitting to deal with potential different units of the responses. Default is `TRUE`.
+- `prev_iter`: index of the iteration to start from (e.g. to resume a previously interrupted computation). Set `prev_iter = -1` if one wants to start from the last saved iteration.
+
+There are other parameters that can be used to control the training behavior, such as `weight` to adjust the relative importance of the phenotypes, `p.factor` to control the priority of each variable to be selected by the model.
+
+```{r}
+configs <- list(
+  plink2.path = "plink2",   # path to plink2 program
+  zstdcat.path = "zstdcat"  # path to zstdcat program
+)
+# check if the provided paths are valid
+for (name in names(configs)) {
+  tryCatch(system(paste(configs[[name]], "-h"), ignore.stdout = T),
+    condition = function(e) cat("Please add", configs[[name]], "to PATH, or modify the path in the configs list.")
+  )
+}
+```
+
 ### A Simple Example
 
 ```{r}
-library(multisnpnet)
+library(multiSnpnet)
 ```
 
 ```{r, results='hide', message=FALSE, warning=FALSE}
+genotype_file <- file.path(system.file("extdata", package = "multiSnpnet"), "sample")
+phenotype_file <- system.file("extdata", "sample.phe", package = "multiSnpnet")
+
+phenotype_names <- c("QPHE", "BPHE")
+covariate_names <- c("age", "sex", paste0("PC", 1:10))
+
 fit_multisnpnet <- multisnpnet(
-    genotype_file = genotype_file,
-    phenotype_file = phenotype_file,
-    phenotype_names = phenotype_names,
-    covariate_names = covariate_names,
-    #   results_dir = results_dir,
-    rank = r,
-    batch_size = batch_size,
-    split_col = split.col,
-    max.iter = max.iter,
-#      thresh = thresh,
-    configs = configs,
-    lambda.min.ratio = lambda.min.ratio,
-    nlambda = nlambda,
-    standardize_response = standardize_response,
-    save = save,
-    validation = validation,
-    prev_iter = prev_iter,
-    early_stopping = early_stopping,
-    # glmnet_thresh = thresh,
-    weight = weight,
-    mem = mem
-)
+  genotype_file = genotype_file,
+  phenotype_file = phenotype_file,
+  phenotype_names = phenotype_names,
+  covariate_names = covariate_names,
+  rank = 2,
+  nlambda = 10,
+  validation = TRUE,
+  split_col = "split",
+  batch_size = 100,
+  standardize_response = TRUE,
+  save = TRUE
+) # we hide the intermediate messages
+```
+
+We can make prediction with the fitted object `fit_multisnpnet`. For example,
+```{r, warning=FALSE, message=FALSE}
+pred_multisnpnet <- predict_multisnpnet(
+  fit = fit_multisnpnet,
+  new_genotype_file = genotype_file,
+  new_phenotype_file = phenotype_file,
+  covariate_names = covariate_names,
+  split_col = "split",
+  split_name = c("train", "val"),  # can also include "test" if such samples are available in the phenotype file
+  binary_phenotypes = c("BPHE"))
+```
+
+We can extract the R-squared ($R^2$) for both phenotypes.
+
+```{r}
+pred_multisnpnet$R2
+```
+
+We can also obtain AUC for the specified binary phenotypes.
+
+```{r}
+pred_multisnpnet$AUC
 ```
 
 ### Example of Biplot Visualization
 
-The coefficent matrix $C$ in the returned value from `multisnpnet::multisnpnet()` has the dimension of $p \times q$. One can visualize this matrix with a biplot visualization.
+The coefficent matrix $C$ in the returned value from `multiSnpnet::multisnpnet()` has the dimension of $p \times q$. One can visualize this matrix with a biplot visualization.
 
 ```{r}
+fit_single <- fit_multisnpnet[[10]]
+if (require(ggrepel))
 plot_biplot(
-    svd(t(fit_multisnpnet$C)),
-    label=list(
-        'phenotype'=rownames(A_init), # we should update this phenotype labels so that it matches with the simple example above.
-        'variants'=rownames(fit$C)
-    )
+  svd(t(as.matrix(fit_single$C))),
+  label=list(
+    'phenotype'=rownames(fit_single$A_init), # we should update this phenotype labels so that it matches with the simple example above.
+    'variants'=rownames(fit_single$C)
+  )
 )
 ```
 
@@ -69,21 +141,22 @@ By default, this function annotates 5 phenotypes and 5 variants based on the dis
 Alternatively, you can generate an interactive plot with `plotly` with mouseover annotation of phenotypes and variants. In that case, you need to disable the static annotation by specifying `use_ggrepel=FALSE`.
 
 ```{r}
-if (!require('plotly', character.only = TRUE)) {
-    install.packages('plotly', dependencies = TRUE)
-    library('plotly', character.only = TRUE)
-}
-
-plot_biplot(
-    svd(t(fit_multisnpnet$C)),
+# if (!require('plotly', character.only = TRUE)) {
+#   install.packages('plotly', dependencies = TRUE)
+#   library('plotly', character.only = TRUE)
+# }
+if (require(plotly)) {
+  plot_biplot(
+    svd(t(as.matrix(fit_single$C))),
     label=list(
-        'phenotype'=rownames(A_init), # we should update this phenotype labels so that it matches with the simple example above.
-        'variants'=rownames(fit$C)
+      'phenotype'=rownames(fit_single$A_init), # we should update this phenotype labels so that it matches with the simple example above.
+      'variants'=rownames(fit_single$C)
     ),
     use_ggrepel=FALSE
-) %>%
-plotly::ggplotly() %>%
-htmlwidgets::saveWidget('multisnpnet.biplot.html', selfcontained = F, libdir = "lib")
+  ) %>%
+    plotly::ggplotly() %>%
+    htmlwidgets::saveWidget('multisnpnet.biplot.html', selfcontained = F, libdir = "lib")
+}
 ```
 
 You can open the resulting html file (`multisnpnet.biplot.html`) with your favorite browser.

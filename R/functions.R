@@ -561,7 +561,11 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   for (split in split_name) {
     response[[split]] <- as.matrix(phe[[split]][, phenotype_names, with = F])
     if (length(binary_phenotypes) > 0) {
-      response[[split]][, binary_phenotypes] <- response[[split]][, binary_phenotypes] - 1
+      for (bphe in binary_phenotypes) {
+        if (all(response[[split]][, bphe] >= 1, na.rm = T) && all(response[[split]][, bphe] <= 2, na.rm = T)) {
+          response[[split]][, binary_phenotypes] <- response[[split]][, binary_phenotypes] - 1
+        }
+      }
     }
     variance[[split]] <- apply(response[[split]], 2, function(x) mean((x - mean(x, na.rm = T))^2, na.rm = T))
   }
