@@ -63,19 +63,6 @@ setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_
   configs
 }
 
-#' @importFrom data.table set
-fill_missing <- function(data, colnames, key, values) {
-  if (length(values) == 1) values <- rep(values, length(colnames))
-  if (is.na(key)) {
-    for (j in 1:length(colnames)) {
-      set(data, i=which(is.na(data[[colnames[j]]])), j=colnames[j], value=values[j])
-    }
-  } else {
-    for (j in 1:length(colnames)) {
-      set(data, i=which(data[[colnames[j]]] == key), j=colnames[j], value=values[j])
-    }
-  }
-}
 
 initial_Y_imputation <- function(response, covariates, missing_response) {
   residual <- matrix(NA, nrow(response), ncol(response))

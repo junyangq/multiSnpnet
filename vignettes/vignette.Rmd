@@ -113,7 +113,7 @@ We can extract the R-squared ($R^2$) for both phenotypes.
 pred_multisnpnet$R2
 ```
 
-We can also obtain AUC for the specified binary phenotypes.
+The negative validation $R^2$'s are caused by overfitting. We can also obtain AUC for the specified binary phenotypes.
 
 ```{r}
 pred_multisnpnet$AUC

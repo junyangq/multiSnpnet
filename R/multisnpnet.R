@@ -74,20 +74,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   ids <- list()
   ids[["psam"]] <- snpnet:::readIDsFromPsam(paste0(genotype_file, '.psam'))
 
-  ctype <- c("FID" = "character", "IID" = "character")
-  if (!is.null(split_col)) ctype[split_col] <- "character"
-  phe_master <- data.table::fread(phenotype_file, colClasses = ctype, select = c("FID", "IID", split_col, covariate_names, phenotype_names))
-  if (length(covariate_names) > 0) {  # remove individuals with missing covariate values
-    cov_master <- as.matrix(phe_master[, covariate_names, with = F])
-    cov_no_missing <- apply(cov_master, 1, function(x) all(!is.na(x)))
-    phe_master <- phe_master[cov_no_missing, ]
-  }
-  phe_master[["ID"]] <- paste(phe_master[["FID"]], phe_master[["IID"]], sep = "_")
-  phe_master <- phe_master %>%
-    dplyr::left_join(data.frame(ID = ids[["psam"]], sort_order = seq_along(ids[["psam"]]), stringsAsFactors = FALSE), by = "ID") %>%
-    dplyr::arrange(sort_order) %>% dplyr::select(-sort_order) %>%
-    data.table::as.data.table()
-  fill_missing(phe_master, phenotype_names, -9, NA) # replace -9 with NA
+  phe_master <- snpnet::readPheMaster(phenotype_file, ids[['psam']], NULL, covariate_names, phenotype_names, NULL, split_col, configs)
 
   if (is.null(split_col)) {
     splits <- c('train')
