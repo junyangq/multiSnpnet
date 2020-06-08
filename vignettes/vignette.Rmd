@@ -16,14 +16,14 @@ knitr::opts_chunk$set(
 )
 ```
 
-### Introduction
+## Introduction
 
 **multiSnpnet** is a package that is used to fit sparse reduced rank regression for multiple responses on big genomics data. It optimizes the following objective function:
 $$
-\begin{align}
+\begin{aligned}
 \text{minimize} & \quad  \frac{1}{2} \|\mathcal{P}_\Omega(\mathbf{Y})-\mathcal{P}_\Omega(\mathbf{X}\mathbf{UV}^\top)\|_F^2 + \lambda \|\mathbf{U}\|_{1,2}, \\
 \text{s.t.} & \quad \mathbf{V}^\top \mathbf{V} = \mathbf{I},
-\end{align}
+\end{aligned}
 $$
 where $\mathcal{P}_\Omega$ is a projection operator for missing values in $\mathbf{Y}$, i.e. $\mathcal{P}_\Omega(\mathbf{Y})_{ij} = \mathbf{Y}_{ij}$ if $\mathbf{Y}_{ij}$ is not missing and $0$ otherwise, and $\|\mathbf{U}\|_{1,2} = \sum_{j=1}^p \|\mathbf{U}_{j\cdot}\|_2$.
 
@@ -54,7 +54,7 @@ Some additional important parameters for model building include:
 
 There are other parameters that can be used to control the training behavior, such as `weight` to adjust the relative importance of the phenotypes, `p.factor` to control the priority of each variable entering the model.
 
-### A Simple Example
+## A Simple Example
 
 ```{r}
 library(multiSnpnet)
@@ -119,7 +119,7 @@ The negative validation $R^2$'s are caused by overfitting. We can also obtain AU
 pred_multisnpnet$AUC
 ```
 
-### Example of Biplot Visualization
+## Example of Biplot Visualization
 
 The coefficent matrix $C$ in the returned value from `multiSnpnet::multisnpnet()` has the dimension of $p \times q$. One can visualize this matrix with a biplot visualization.
 

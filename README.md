@@ -46,5 +46,9 @@ out <- multisnpnet(
 ### References:
 
 [1] Junyang Qian, Yosuke Tanigawa, Ruilin Li, Robert Tibshirani, Manuel A. Rivas, and Trevor Hastie. "Large-Scale Sparse Regression for Multiple Responses with Applications to UK Biobank." bioRxiv, 2020. doi: 10.1101/2020.05.30.125252
+<<<<<<< HEAD
 
 [2] Lisha Chen, and Jianhua Huang. "Sparse Reduced-Rank Regression for Simultaneous Dimension Reduction and Variable Selection." Journal of the American Statistical Association 107.500 (2012): 1533-1545.
+=======
+[2] Lisha Chen, and Jianhua Huang. "Sparse reduced-rank regression for simultaneous dimension reduction and variable selection." Journal of the American Statistical Association 107.500 (2012): 1533-1545.
+>>>>>>> 177b2f1... Update README.md
