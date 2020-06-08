@@ -27,21 +27,20 @@ $$
 $$
 where $\mathcal{P}_\Omega$ is a projection operator for missing values in $\mathbf{Y}$, i.e. $\mathcal{P}_\Omega(\mathbf{Y})_{ij} = \mathbf{Y}_{ij}$ if $\mathbf{Y}_{ij}$ is not missing and $0$ otherwise, and $\|\mathbf{U}\|_{1,2} = \sum_{j=1}^p \|\mathbf{U}_{j\cdot}\|_2$.
 
-We assume the data are stored in .pgen/.pvar/.psam format by the [PLINK library](https://www.cog-genomics.org/plink/2.0/formats#pgen). The potential training/validation split can be specified with a separate column in the phenotype file.
+We assume the data are stored in .pgen/.pvar/.psam format by the [PLINK library](https://www.cog-genomics.org/plink/2.0/formats#pgen). The potential training/validation split can be specified by a separate column in the phenotype file.
 
 The most essential parameters in the core function `multisnpnet` include:
 
 - `genotype_file`: the PLINK 2.0 pgen file that contains genotype. We assume the existence of genotype_file.{pgen,pvar.zst,psam}.
-- `phenotype_file`: the path of the file that contains the phenotype values and can be read as a table.
-- `phenotype_names`: names of the phenotype. Must be consistent with the column names in the phenotype file.
-- `covariate_names`: a character vector containing the names of the covariates included in the fitting, whose coefficients will not be penalized. The names must exist in the column names of the phenotype file.
+- `phenotype_file`: the path of the file that contains the phenotype values and can be read as a table. Missing values are expected to be encoded as -9.
+- `phenotype_names`: names of the phenotypes. Must be consistent with the column names in the phenotype file.
+- `covariate_names`: a character vector containing the names of the covariates included in the fitting, whose coefficients will not be penalized. The names must exist in the column names of the phenotype file. Can be an empty vector.
 - `rank`: target rank of the reduced rank model.
 - `validation`: whether to evaluate the model performance on the validation set.
-- `split_col`: the column name in the phenotype file that specifies the membership of individuals to the training or the validation set. The individuals marked as `"train"` and `"val"` will be treated as the training and validation set, respectively. When specified, the model performance is evaluated on both the training and the validation sets.
+- `split_col`: the column name in the phenotype file that specifies the membership of individuals to the training or the validation set. The individuals marked as `"train"` and `"val"` will be treated as the training and validation set, respectively. If not specified, all the qualified samples will be treated as training samples.
 - `mem`: Memory (MB) available for the program. It tells PLINK 2.0 the amount of memory it can harness for the computation. IMPORTANT if using a job scheduler.
 - `batch_size`: the number of variants used in each batch screening and should be chosen based on the problem size and memory available. Default is 100.
-- `save`: a boolean indicating whether to save intermediate results.
-
+- `save`: a boolean indicating whether to save intermediate results. If `TRUE`, `results.dir` in the `configs` list should be provided.
 - `configs`: a list of additional configuration parameters. It can include:
     + `results.dir`: path to the directory holding intermediate results, if `save = TRUE`.
     + `nCores`: number of cores used for computation.
@@ -53,7 +52,13 @@ Some additional important parameters for model building include:
 - `standardize_response`: whether to standardize the responses before fitting to deal with potential different units of the responses. Default is `TRUE`.
 - `prev_iter`: index of the iteration to start from (e.g. to resume a previously interrupted computation). Set `prev_iter = -1` if one wants to start from the last saved iteration.
 
-There are other parameters that can be used to control the training behavior, such as `weight` to adjust the relative importance of the phenotypes, `p.factor` to control the priority of each variable to be selected by the model.
+There are other parameters that can be used to control the training behavior, such as `weight` to adjust the relative importance of the phenotypes, `p.factor` to control the priority of each variable entering the model.
+
+### A Simple Example
+
+```{r}
+library(multiSnpnet)
+```
 
 ```{r}
 configs <- list(
@@ -66,12 +71,6 @@ for (name in names(configs)) {
     condition = function(e) cat("Please add", configs[[name]], "to PATH, or modify the path in the configs list.")
   )
 }
-```
-
-### A Simple Example
-
-```{r}
-library(multiSnpnet)
 ```
 
 ```{r, results='hide', message=FALSE, warning=FALSE}

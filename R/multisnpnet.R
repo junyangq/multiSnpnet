@@ -14,7 +14,7 @@
 #' @param genotype_file Path to the suite of genotype files. genotype_file.{pgen, psam, pvar.zst}
 #'   must exist.
 #' @param phenotype_file Path to the phenotype. The header must include FID, IID, covariate_names
-#'   and phenotype_names.
+#'   and phenotype_names. Missing values are expected to be encoded as -9.
 #' @param binary_phenotypes Names of the binary phenotypes. AUC will be evaluated for binary
 #'   phenotypes.
 #' @param covariate_names Character vector of the names of the adjustment covariates.

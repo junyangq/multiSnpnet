@@ -15,7 +15,7 @@ multisnpnet(genotype_file, phenotype_file, phenotype_names, binary_phenotypes = 
 must exist.}
 
 \item{phenotype_file}{Path to the phenotype. The header must include FID, IID, covariate_names
-and phenotype_names.}
+and phenotype_names. Missing values are expected to be encoded as -9.}
 
 \item{binary_phenotypes}{Names of the binary phenotypes. AUC will be evaluated for binary
 phenotypes.}
