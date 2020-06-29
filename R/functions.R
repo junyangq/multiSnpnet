@@ -466,7 +466,7 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
     dplyr::arrange(sort_order) %>% dplyr::select(-sort_order) %>%
     data.table::as.data.table()
 
-  fill_missing(phe_master, phenotype_names, -9, NA)
+  #fill_missing(phe_master, phenotype_names, -9, NA)
 
   if (is.null(split_col)) {
     split_name <- "train"
