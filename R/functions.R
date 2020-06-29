@@ -848,6 +848,28 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
   out
 }
 
+#' Generate color palette
+#'
+#' @param key An optional argument to select a specific color in palette.
+#'
+get_cb_colors <- function(key=NULL){
+  cb.colors <- c(
+    black = "#000000",
+    orange = "#E69F00",
+    sky.blue = "#56B4E9",
+    bluish.green = "#009E73",
+    yellow = "#F0E442",
+    blue = "#0072B2",
+    vermilion = "#D55E00",
+    reddish.purple = "#CC79A7"
+  )
+  if(is.null(key) || (! key %in% names(cb.colors))){
+    cb.colors
+  }else{
+    cb.colors[[ key ]]
+  }
+}
+
 #' Make biplots of the multisnpnet results
 #'
 #' Generate biplot visualization based on the decomposed coefficient matrix C.
@@ -875,7 +897,7 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
 plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
                         label=list('phenotype'=NULL, 'variant'=NULL),
                         n_labels=list('phenotype'=5, 'variant'=5),
-                        color=list('phenotype'='red', 'variant'='blue'),
+                        color=list('phenotype'='orange', 'variant'='sky.blue'),
                         shape=list('phenotype'=20, 'variant'=4),
                         axis_label=list('main'='variant', 'sub'='phenotype'),
                         use_ggrepel=TRUE) {
@@ -890,6 +912,16 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
     rownames(vd) <- label[['variant']]
     colnames(u)  <- 1:length(svd_obj$d)
     colnames(vd) <- 1:length(svd_obj$d)
+
+    # configure plotting colors
+    cb.colors <- get_cb_colors()
+    for(k in names(color)){
+      if(color[[k]] %in% names(cb.colors)){
+        color[[ sprintf('plot_%s', k) ]] <- cb.colors[[ color[[ k ]] ]]
+      }else{
+        color[[ sprintf('plot_%s', k) ]] <- color[[ k ]]
+      }
+    }
 
     # convert the matrices into data frames
     df_u  <- u  %>% as.data.frame() %>% rename('PC_x' := component$x, 'PC_y' := component$y) %>%
@@ -918,21 +950,21 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
           # scatter plot for (VD)
             data=df_vd, mapping=aes(x=PC_x, y=PC_y, shape='variant', label=label),
             geom='point', stat = "identity", position = "identity",
-            params=list(size=1, color=color[['variant']])
+            params=list(size=1, color=color[['plot_variant']])
         )+
         layer(
           # segments (lines) for U
             data=df_u_scaled,
             mapping=aes(x=0, y=0, xend=PC_x, yend=PC_y),
             geom='segment', stat = "identity", position = "identity",
-            params=list(size=1, color=color[['phenotype']], alpha=.2)
+            params=list(size=1, color=color[['plot_phenotype']], alpha=.1)
         )+
         layer(
           # scatter plot for U
             data=df_u_scaled,
             mapping=aes(x=PC_x, y=PC_y, shape='phenotype', label=label),
             geom='point', stat = "identity", position = "identity",
-            params=list(size=1, color=color[['phenotype']])
+            params=list(size=1, color=color[['plot_phenotype']])
         )
 
     } else { # use_ggrepel == TRUE
@@ -941,24 +973,24 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
         layer(
             data=df_vd, mapping=aes(x=PC_x, y=PC_y, shape='variant'),
             geom='point', stat = "identity", position = "identity",
-            params=list(size=1, color=color[['variant']])
+            params=list(size=1, color=color[['plot_variant']])
         )+
         layer(
             data=df_u_scaled,
             mapping=aes(x=0, y=0, xend=PC_x, yend=PC_y),
             geom='segment', stat = "identity", position = "identity",
-            params=list(size=1, color=color[['phenotype']], alpha=.2)
+            params=list(size=1, color=color[['plot_phenotype']], alpha=.1)
         )+
         layer(
             data=df_u_scaled,
             mapping=aes(x=PC_x, y=PC_y, shape='phenotype'),
             geom='point', stat = "identity", position = "identity",
-            params=list(size=1, color=color[['phenotype']])
+            params=list(size=1, color=color[['plot_phenotype']])
         )+
         ggrepel::geom_text_repel(
             data=bind_rows(
-                df_u_scaled %>% mutate(color=color[['phenotype']]),
-                df_vd       %>% mutate(color=color[['variant']])
+                df_u_scaled %>% mutate(color=color[['plot_phenotype']]),
+                df_vd       %>% mutate(color=color[['plot_variant']])
             ),
             mapping=aes(x=PC_x, y=PC_y, label=label, color=color),
             size=3, force=10
@@ -975,11 +1007,11 @@ plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
         limits = c(-lim_vd_abs, lim_vd_abs),
         sec.axis = sec_axis(
             ~ . * (lim_u_abs/lim_vd_abs),
-            name = sprintf('Component %s (%s [%s])', component$y, axis_label[['sub']], color[['phenotype']])
+            name = sprintf('Component %s (%s [%s])', component$x, axis_label[['sub']], color[['phenotype']])
         )
     ) +
     scale_y_continuous(
-        sprintf('Component %s (%s [%s])', component$x, axis_label[['main']], color[['variant']]),
+        sprintf('Component %s (%s [%s])', component$y, axis_label[['main']], color[['variant']]),
         limits = c(-lim_vd_abs, lim_vd_abs),
         sec.axis = sec_axis(
             ~ . * (lim_u_abs/lim_vd_abs),
