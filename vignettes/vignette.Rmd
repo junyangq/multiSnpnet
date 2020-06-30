@@ -130,7 +130,7 @@ plot_biplot(
   svd(t(as.matrix(fit_single$C))),
   label=list(
     'phenotype'=rownames(fit_single$A_init), # we should update this phenotype labels so that it matches with the simple example above.
-    'variants'=rownames(fit_single$C)
+    'variant'=rownames(fit_single$C)
   )
 )
 ```
@@ -149,7 +149,7 @@ if (require(plotly)) {
     svd(t(as.matrix(fit_single$C))),
     label=list(
       'phenotype'=rownames(fit_single$A_init), # we should update this phenotype labels so that it matches with the simple example above.
-      'variants'=rownames(fit_single$C)
+      'variant'=rownames(fit_single$C)
     ),
     use_ggrepel=FALSE
   ) %>%
