@@ -1,6 +1,6 @@
 setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_names, covariate_names,
                               nlambda, mem,
-                              standardize_response, max.iter, rank, prev_iter, batch_size) {
+                              standardize_response, max.iter, rank, prev_iter, batch_size, save) {
   out.args <- as.list(environment())
   defaults_multi <- list(
     missing.rate = 0.1,
@@ -37,7 +37,8 @@ setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_
     is.A.converge = TRUE,
     thresh = 1e-7,
     MAXLEN = (2^31 - 1) / 2,
-    use_safe = TRUE
+    use_safe = TRUE,
+    excludeSNP = NULL
   )
   for (name in setdiff(names(out.args), "configs")) {
     configs[[name]] <- out.args[[name]]

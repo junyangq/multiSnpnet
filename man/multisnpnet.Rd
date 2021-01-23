@@ -55,6 +55,8 @@ computation).}
 \item{configs}{List of additional configuration parameters. It can include:
 \describe{
 \item{nCores}{number of cores for the PLINK computation (default: 1)}
+\item{results.dir}{directory to save intermediate results if save=TRUE (default: 
+                   temp directory created by the tempdir function)}
 \item{thresh}{convergence threshold for alternating minimization (default: 1E-7)}
 \item{glmnet.thresh}{convergence threshold for glmnet(Plus) (default: 1E-7)}
 \item{plink2.path}{path to the PLINK2.0 program, if not on the system path}
@@ -63,6 +65,8 @@ computation).}
                 multiplication (default: TRUE). One may also specify MAXLEN
                 (default: (2^31-1)/2), the maximum vector length passed to
                 the R base matrix multiplication operation}
+\item{excludeSNP}{character vector containing genotype names to exclude from
+                  the analysis}
 }}
 
 \item{save}{Boolean. Whether to save intermediate results.}

@@ -39,6 +39,8 @@
 #' @param configs List of additional configuration parameters. It can include:
 #'                \describe{
 #'                \item{nCores}{number of cores for the PLINK computation (default: 1)}
+#'                \item{results.dir}{directory to save intermediate results if save=TRUE (default: 
+#'                                   temp directory created by the tempdir function)}
 #'                \item{thresh}{convergence threshold for alternating minimization (default: 1E-7)}
 #'                \item{glmnet.thresh}{convergence threshold for glmnet(Plus) (default: 1E-7)}
 #'                \item{plink2.path}{path to the PLINK2.0 program, if not on the system path}
@@ -47,6 +49,8 @@
 #'                                multiplication (default: TRUE). One may also specify MAXLEN
 #'                                (default: (2^31-1)/2), the maximum vector length passed to
 #'                                the R base matrix multiplication operation}
+#'                \item{excludeSNP}{character vector containing genotype names to exclude from
+#'                                  the analysis}
 #'                }
 #' @param save Boolean. Whether to save intermediate results.
 #' @param early_stopping Whether to stop the process early if validation metric starts to fall.
@@ -62,7 +66,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
                         early_stopping = FALSE) {
 
   configs <- setupMultiConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names,
-                               nlambda, mem, standardize_response, max.iter, rank, prev_iter, batch_size)
+                               nlambda, mem, standardize_response, max.iter, rank, prev_iter, batch_size, save)
 
   start_all <- Sys.time()
 
@@ -357,7 +361,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       prod_resid <- snpnet:::computeProduct(residuals, genotype_file, vars, stats, configs, iter=0) / length(rowIdx_subset_gen)
       norm_prod <- row_norm2(prod_resid)
       norm_prod <- norm_prod / p.factor[names(norm_prod)]
-      norm_prod[configs[["excludeSNP"]]] <- NA
+      norm_prod[stats[["excludeSNP"]]] <- NA
       norm_prod_inner <- norm_prod
       norm_prod_inner[setdiff(colnames(features_train), covariate_names)] <- NA
       current_active <- which_row_active(fit$B)
@@ -379,7 +383,9 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     cat("R2_train:\n")
     print(R2_train)
     metric_train[ilam, ] <- R2_train
-    saveRDS(pred_train, file = file.path(configs[["results.dir"]], "train", paste0("pred_score_", ilam, ".rds")))
+    if (save) {
+      saveRDS(pred_train, file = file.path(configs[["results.dir"]], "train", paste0("pred_score_", ilam, ".rds")))
+    }
 
     if (validation) {
       if (rank == ncol(response_train)) {
@@ -397,7 +403,9 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       cat("R2_val:\n")
       print(R2_val)
       metric_val[ilam, ] <- R2_val
-      saveRDS(pred_val, file = file.path(configs[["results.dir"]], "val", paste0("pred_score_", ilam, ".rds")))
+      if (save) {
+        saveRDS(pred_val, file = file.path(configs[["results.dir"]], "val", paste0("pred_score_", ilam, ".rds")))
+      }
     }
 
     if (length(binary_phenotypes) > 0) {

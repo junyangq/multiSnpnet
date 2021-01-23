@@ -9,7 +9,7 @@ plot_biplot(
   component = list(x = 1, y = 2),
   label = list(phenotype = NULL, variant = NULL),
   n_labels = list(phenotype = 5, variant = 5),
-  color = list(phenotype = "red", variant = "blue"),
+  color = list(phenotype = "orange", variant = "sky.blue"),
   shape = list(phenotype = 20, variant = 4),
   axis_label = list(main = "variant", sub = "phenotype"),
   use_ggrepel = TRUE
