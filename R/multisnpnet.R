@@ -435,7 +435,9 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     }
 
     fit[["stats"]] <- stats
-    fit[["std_obj"]] <- std_obj
+    if (standardize_response) {
+      fit[["std_obj"]] <- std_obj
+    }
     fit[["weight"]] <- weight
     fit[["configs"]] <- configs
     fit_list[[ilam]] <- fit
