@@ -438,10 +438,20 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
     }
   }
   stats <- fit[[length(fit)]][["stats"]]
-  std_obj <- fit[[length(fit)]][["std_obj"]]
+
   weight <- fit[[length(fit)]][["weight"]]
   phenotype_names <- colnames(as.matrix(fit[[length(fit)]][["C"]]))
   is_full_rank <- (ncol(as.matrix(fit[[length(fit)]][["B"]])) == ncol(as.matrix(fit[[length(fit)]][["C"]])))
+
+  if ("std_obj" %in% names(fit[[length(fit)]])) {
+    std_obj <- fit[[length(fit)]][["std_obj"]]
+  } else {
+    means_std <- rep(0, length(phenotype_names))
+    names(means_std) <- phenotype_names
+    sds_std <- rep(1, length(phenotype_names))
+    names(sds_std) <- phenotype_names
+    std_obj <- list(means = means_std, sds = sds_std)
+  }
 
   covariate_names_fit <- rownames(fit[[length(fit)]][["W"]])
   if (!setequal(covariate_names_fit, covariate_names)) {
