@@ -871,6 +871,62 @@ tsvd_of_C_with_names <- function(fit_obj, component_prefix='Component', rank=NUL
 }
 
 
+#' Compute the contribution scores
+#'
+#' Compute the relative importance traits (or variants) for each component as defined in Tanigawa et al Nat Comm 2019.
+#'
+#' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit).
+#'   Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.
+#' @param right_singular_vectors An indicator variable to specify if we compute the score for right singular vector or not. If true, we compute the variant squared cosine score. If false, we compute phenotype squared cosine score.
+#'
+#' @importFrom magrittr '%>%'
+#' @importFrom tibble rownames_to_column
+#' @importFrom tidyr gather
+#'
+#' @export
+score_contribution <- function(svd_obj, right_singular_vectors=FALSE){
+  if(right_singular_vectors){
+    singular_vectors <- svd_obj$v
+  }else{
+      singular_vectors <- svd_obj$u
+  }
+  (singular_vectors ** 2) %>%
+  as.data.frame() %>% rownames_to_column() %>%
+  gather(component, contribution_score, -rowname)
+}
+
+
+#' Compute the squared cosine scores
+#'
+#' Compute the relative importance of components for each trait (or variant) as defined in Tanigawa et al Nat Comm 2019.
+#'
+#' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit).
+#'   Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.
+#' @param right_singular_vectors An indicator variable to specify if we compute the score for right singular vector or not. If true, we compute the variant squared cosine score. If false, we compute phenotype squared cosine score.
+#' @param component_prefix A string used as a prefix for the column names corresponding to the latent variables
+#'
+#' @importFrom magrittr '%>%'
+#' @importFrom tibble rownames_to_column
+#' @importFrom tidyr gather
+#' @importFrom dplyr mutate
+#'
+#' @export
+score_squared_cosine <- function(svd_obj, right_singular_vectors=FALSE, component_prefix='Component'){
+  if(right_singular_vectors){
+    singular_vectors <- svd_obj$v
+  }else{
+      singular_vectors <- svd_obj$u
+  }
+
+  ((((singular_vectors) %*% diag(svd_obj$d)) ** 2) / rowSums(((singular_vectors) %*% diag(svd_obj$d)) ** 2)) %>%
+  as.data.frame() %>% rownames_to_column() %>%
+  gather(component, squared_cosine_score, -rowname) %>%
+  mutate(component = str_replace(component, '^V', component_prefix))
+}
+
+
 #' Generate color palette
 #'
 #' @param key An optional argument to select a specific color in palette.
@@ -900,7 +956,7 @@ get_cb_colors <- function(key=NULL){
 #' One of the most common use case is: plot_biplot(svd(t(fit$C)), label=list('phenotype'=rownames(A_init), 'variant'=rownames(fit$C)))
 #'
 #' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
-#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)).
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit)
 #'   Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.
 #' @param component A named list that specifies the index of the components used in the plot.
 #' @param label A named list that specifies the phenotype and variant labels.
