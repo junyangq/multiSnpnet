@@ -846,6 +846,31 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
   out
 }
 
+
+#' Compute the TSVD of the regression coefficient
+#'
+#' Compute the TSVD of the regression coefficient C and set colnames and rownames in the decomposed matrices.
+#'
+#' @param fit_obj A named list containing the results of the multisnpnet results.
+#' @param component_prefix A string used as a prefix for the column names corresponding to the latent variables
+#' @param rank Desired rank of the decomposed matrices
+#'
+#' @export
+tsvd_of_C_with_names <- function(fit_obj, component_prefix='Component', rank=NULL){
+  if(is.null(rank)){
+    rank <- min(dim(fit_obj$C))
+  }
+  svd_of_C <- svd(t(as.matrix(fit_obj$C)), nu = rank, nv = rank)
+  svd_of_C$d <- svd_of_C$d[1:rank]
+  svd_of_C$d <- setNames(svd_of_C$d, paste0(component_prefix, 1:length(svd_of_C$d)))
+  colnames(svd_of_C$v) <- names(svd_of_C$d)
+  colnames(svd_of_C$u) <- names(svd_of_C$d)
+  rownames(svd_of_C$v) <- rownames(fit_obj$C)
+  rownames(svd_of_C$u) <- colnames(fit_obj$C)
+  return(svd_of_C)
+}
+
+
 #' Generate color palette
 #'
 #' @param key An optional argument to select a specific color in palette.
@@ -867,6 +892,7 @@ get_cb_colors <- function(key=NULL){
     cb.colors[[ key ]]
   }
 }
+
 
 #' Make biplots of the multisnpnet results
 #'
