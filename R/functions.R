@@ -394,6 +394,19 @@ coef_multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
   out
 }
 
+#' Read the list of genetic variants present in the dataset.
+#'
+#' @param genotype_file Path to the new suite of genotype files. genotype_file.pvar.zst must exist.
+#' @param zstdcat_path Path to zstdcat program, needed when loading variants
+#'
+#' @return A data frame containig the list of variants present in the genetic dataset.
+#'
+#' @export
+read_pvar <- function(genotype_file, zstdcat_path = 'zstd'){
+    dplyr::rename(data.table::fread(cmd=paste0(zstdcat_path, ' ', paste0(genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM')
+
+}
+
 #' Predict from the Fitted Object or File
 #'
 #' @param fit List of fit object returned from multisnpnet.
@@ -503,7 +516,7 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
     }
   }
 
-  vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0(zstdcat_path, ' ', paste0(new_genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
+  vars <- dplyr::mutate(read_pvar(new_genotype_file, zstdcat_path), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
   pvar <- pgenlibr::NewPvar(paste0(new_genotype_file, '.pvar.zst'))
   chr <- list()
   for (split in split_name) {
@@ -846,6 +859,60 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
   out
 }
 
+#' Get the path of the R data file
+#'
+#' @param results_dir The results directory.
+#' @param idx Lambda index
+#'
+#' @export
+get_rdata_path <- function(results_dir, idx){
+    return(file.path(results_dir, paste0("output_lambda_", idx, ".RData")))
+}
+
+#' Get the index of the previous iteration in a specified results directory
+#'
+#' @param results_dir The results directory.
+#' @param nlambda The maximum number of lambda
+#'
+#' @export
+find_prev_iter <- function(results_dir, nlambda = 100){
+    prev_iter <- 0
+    for (idx in 1:nlambda) {
+        if (file.exists(get_rdata_path(results_dir, idx))) prev_iter <- idx
+    }
+    return(prev_iter)
+}
+
+
+
+#' Extract the non-zero coefficients from the fit object
+#'
+#' Extract the coefficients (C) from the fit object where the coefficient has at least one non-zero entry across the response variables
+#'
+#' @param fit_obj A named list containing the results of the multisnpnet results.
+#'
+#' @export
+get_non_zero_coefficients <- function(fit_obj){
+  return(fit_obj$C[apply(fit_obj$C,1,function(x){! all(x == 0)}), ])
+}
+
+#' Extract the non-zero coefficients from the fit object and return it as a data frame
+#'
+#' Extract the coefficients (C) from the fit object where the coefficient has at least one non-zero entry across the response variables. The function also reads the pvar file so that the resulting data frame has the chromosomal position of the genetic variants.
+#'
+#' @param fit_obj A named list containing the results of the multisnpnet results.
+#' @param genotype_file Path to the new suite of genotype files. genotype_file.pvar.zst must exist.
+#' @param zstdcat_path Path to zstdcat program, needed when loading variants.
+#'
+#' @export
+get_non_zero_coefficients_as_data_frame <- function(fit_obj, genotype_file, zstdcat_path = 'zstd'){
+  return(inner_join(
+    read_pvar(genotype_file, zstdcat_path),
+    separate(rownames_to_column(as.data.frame(get_non_zero_coefficients(fit_obj)), 'ID_ALT'), 'ID_ALT', c('ID', 'ALT'), sep='_'),
+    by = c("ID", "ALT")
+  ))
+}
+
 
 #' Compute the TSVD of the regression coefficient
 #'
@@ -860,7 +927,7 @@ tsvd_of_C_with_names <- function(fit_obj, component_prefix='Component', rank=NUL
   if(is.null(rank)){
     rank <- min(dim(fit_obj$C))
   }
-  svd_of_C <- svd(t(as.matrix(fit_obj$C)), nu = rank, nv = rank)
+  svd_of_C <- svd(t(as.matrix(get_non_zero_coefficients(fit_obj))), nu = rank, nv = rank)
   svd_of_C$d <- svd_of_C$d[1:rank]
   svd_of_C$d <- setNames(svd_of_C$d, paste0(component_prefix, 1:length(svd_of_C$d)))
   colnames(svd_of_C$v) <- names(svd_of_C$d)

@@ -39,7 +39,7 @@
 #' @param configs List of additional configuration parameters. It can include:
 #'                \describe{
 #'                \item{nCores}{number of cores for the PLINK computation (default: 1)}
-#'                \item{results.dir}{directory to save intermediate results if save=TRUE (default: 
+#'                \item{results.dir}{directory to save intermediate results if save=TRUE (default:
 #'                                   temp directory created by the tempdir function)}
 #'                \item{thresh}{convergence threshold for alternating minimization (default: 1E-7)}
 #'                \item{glmnet.thresh}{convergence threshold for glmnet(Plus) (default: 1E-7)}
@@ -107,7 +107,6 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   phe_train <- phe_master[match(ids_valid, cat_ids), ]
   if (validation) phe_val <- phe_master[match(ids_valid_val, cat_ids), ]
 
-  vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0(configs[['zstdcat.path']], ' ', paste0(genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
   pvar <- pgenlibr::NewPvar(paste0(genotype_file, '.pvar.zst'))
   chr_train <- pgenlibr::NewPgen(paste0(genotype_file, '.pgen'), pvar = pvar, sample_subset = match(ids_valid, ids[['psam']]))
   n_chr_train <- length(ids[['train']])
@@ -118,7 +117,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   pgenlibr::ClosePvar(pvar)
 
   stats <- snpnet:::computeStats(genotype_file, ids_valid, configs = configs)
-  vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0('zstdcat ', paste0(genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
+  vars <- dplyr::mutate(read_pvar(genotype_file, configs[['zstdcat.path']]), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
 
   if (is.null(p.factor)) {
     p.factor <- rep(1, length(vars))
@@ -231,13 +230,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   }
 
   if (prev_iter < 0) {
-    prev_iter <- 0
-    for (idx in 1:nlambda) {
-      fname <- file.path(configs[["results.dir"]], paste0("output_lambda_", idx, ".RData"))
-      if (file.exists(fname)) {
-        prev_iter <- idx
-      }
-    }
+    prev_iter <- find_prev_iter(configs[["results.dir"]], nlambda)
   }
 
   if (prev_iter != 0) {
@@ -245,7 +238,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
     load_start <- Sys.time()
     new_configs <- configs
     new_pfactor <- p.factor
-    load(file.path(configs[["results.dir"]], paste0("output_lambda_", prev_iter, ".RData")))
+    load(get_rdata_path(configs[["results.dir"]], prev_iter))
     check_configs_diff(configs, new_configs)
     if (!identical(new_pfactor, p.factor)) {
       warning("New p.factor and the saved p.factor are not the same. The new p.factor will be used.\n")  # to allow for running from old results; backward compatibility
@@ -454,7 +447,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       feature_names <- setdiff(colnames(features_train), covariate_names)
       save(fit, ilam, current_active, active, feature_names, norm_prod, B_init, W_init, A_init,
            metric_train, metric_val, AUC_train, AUC_val, nactive, weight, configs, p.factor,
-           file = file.path(configs[["results.dir"]], paste0("output_lambda_", ilam, ".RData")))
+           file = get_rdata_path(configs[["results.dir"]], ilam))
       saveRDS(fit_list, file = file.path(configs[["results.dir"]], "fit_list.rds"))
     }
 
