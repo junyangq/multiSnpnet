@@ -908,7 +908,15 @@ get_non_zero_coefficients <- function(fit_obj){
 get_non_zero_coefficients_as_data_frame <- function(fit_obj, genotype_file, zstdcat_path = 'zstd'){
   return(inner_join(
     read_pvar(genotype_file, zstdcat_path),
-    separate(rownames_to_column(as.data.frame(get_non_zero_coefficients(fit_obj)), 'ID_ALT'), 'ID_ALT', c('ID', 'ALT'), sep='_'),
+    select(
+        mutate(
+            separate(
+                rownames_to_column(as.data.frame(as.matrix(get_non_zero_coefficients(fit_obj))), 'ID_ALT'),
+                "ID_ALT", c("ID_ALT1", "ID_ALT2", "ALT"), sep = "_", extra='merge', fill='left', remove=T
+            ),
+            ID = if_else(is.na(ID_ALT1), ID_ALT2, paste(ID_ALT1, ID_ALT2, sep='_'))
+        ), -ID_ALT1, -ID_ALT2
+    ),
     by = c("ID", "ALT")
   ))
 }
