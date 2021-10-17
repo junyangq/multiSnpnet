@@ -38,7 +38,8 @@ setupMultiConfigs <- function(configs, genotype_file, phenotype_file, phenotype_
     thresh = 1e-7,
     MAXLEN = (2^31 - 1) / 2,
     use_safe = TRUE,
-    excludeSNP = NULL
+    excludeSNP = NULL,
+    converge.type = 'obj'
   )
   for (name in setdiff(names(out.args), "configs")) {
     configs[[name]] <- out.args[[name]]
@@ -144,7 +145,7 @@ alternate_Y_glmnet <- function(features, response, missing_response, lambda, pen
 
 
 SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r, niter, B0, thresh = 1e-7, object0,
-                                              is.warm.start = FALSE, is.A.converge = TRUE, glmnet_thresh = 1e-7) {
+                                              is.warm.start = FALSE, is.A.converge = TRUE, glmnet_thresh = 1e-7, converge_type = "obj") {
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(Y)
@@ -254,15 +255,24 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
     residuals <- Y - Y_new
     obj_values[k] <- 1/(2*n) * sum((residuals)^2) +
       lambda * sum(row_norm2(B))
-
-    if (k > 1 && abs(obj_values[k] - obj_values[k-1]) < thresh*object0) {
-      message <- "Converged"
-      obj_values <- obj_values[1:k]
-      A_niter <- A_niter[1:k]
-      break
+    
+    if (converge_type == "params") {
+      if (k > 1 && (sqrt(sum((C_old - C)^2)) < thresh*sqrt(sum(C^2)))) {
+        message <- "Converged"
+        obj_values <- obj_values[1:k]
+        A_niter <- A_niter[1:k]
+        break
+      }
+    } else {
+      if (k > 1 && abs(obj_values[k] - obj_values[k-1]) < thresh*object0) {
+        message <- "Converged"
+        obj_values <- obj_values[1:k]
+        A_niter <- A_niter[1:k]
+        break
+      }
     }
   }
-
+  
   end_BAY <- Sys.time()
   cat("Finish B-A-Y iteration: ", message, " after ", k, " iterations. ", "Time elapsed: ",
       time_diff(start_BAY, end_BAY), "\n", sep = "")

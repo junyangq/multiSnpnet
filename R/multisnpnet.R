@@ -350,7 +350,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
                                                  missing_response_train, Z1, PZ, lam,
                                                  rank, max.iter, B_init, configs[["thresh"]], object0,
                                                  configs[["is.warm.start"]], configs[["is.A.converge"]],
-                                                 glmnet_thresh = configs[["glmnet.thresh"]])
+                                                 glmnet_thresh = configs[["glmnet.thresh"]], converge_type = configs[["converge.type"]])
       }
       response_train <- fit$response
       residuals <- as.matrix(fit$residuals)
