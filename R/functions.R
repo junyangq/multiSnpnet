@@ -463,7 +463,7 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   stats <- fit[[length(fit)]][["stats"]]
 
   weight <- fit[[length(fit)]][["weight"]]
-  phenotype_names <- colnames(as.matrix(fit[[length(fit)]][["C"]]))
+  phenotype_names <- names(fit[[length(fit)]][["a0"]])
   is_full_rank <- (ncol(as.matrix(fit[[length(fit)]][["B"]])) == ncol(as.matrix(fit[[length(fit)]][["C"]])))
 
   if ("std_obj" %in% names(fit[[length(fit)]])) {
@@ -486,7 +486,7 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
   ids <- list()
   ids[["psam"]] <- snpnet:::readIDsFromPsam(paste0(new_genotype_file, '.psam'))
 
-  configs <- list(zstdcat_path = zstdcat_path)
+  configs <- list(zstdcat.path = zstdcat_path)
   phe_master <- snpnet::readPheMaster(new_phenotype_file, ids[['psam']], NULL, covariate_names, phenotype_names, NULL, split_col, configs)
 
   if (is.null(split_col)) {
