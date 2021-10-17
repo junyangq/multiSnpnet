@@ -17,7 +17,7 @@ plot_biplot(
 }
 \arguments{
 \item{svd_obj}{A named list containing three matrices with u, d, and v as their names as in the
-output from base::svd() function. One can pass the results of base::svd(t(fit$C)).
+output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit)
 Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.}
 
 \item{component}{A named list that specifies the index of the components used in the plot.}

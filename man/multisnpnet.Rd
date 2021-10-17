@@ -55,7 +55,7 @@ computation).}
 \item{configs}{List of additional configuration parameters. It can include:
 \describe{
 \item{nCores}{number of cores for the PLINK computation (default: 1)}
-\item{results.dir}{directory to save intermediate results if save=TRUE (default: 
+\item{results.dir}{directory to save intermediate results if save=TRUE (default:
                    temp directory created by the tempdir function)}
 \item{thresh}{convergence threshold for alternating minimization (default: 1E-7)}
 \item{glmnet.thresh}{convergence threshold for glmnet(Plus) (default: 1E-7)}
