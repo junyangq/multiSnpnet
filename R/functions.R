@@ -404,6 +404,19 @@ coef_multisnpnet <- function(fit = NULL, fit_path = NULL, idx = NULL, uv = TRUE)
   out
 }
 
+#' Read the list of genetic variants present in the dataset.
+#'
+#' @param genotype_file Path to the new suite of genotype files. genotype_file.pvar.zst must exist.
+#' @param zstdcat_path Path to zstdcat program, needed when loading variants
+#'
+#' @return A data frame containig the list of variants present in the genetic dataset.
+#'
+#' @export
+read_pvar <- function(genotype_file, zstdcat_path = 'zstd'){
+    dplyr::rename(data.table::fread(cmd=paste0(zstdcat_path, ' ', paste0(genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM')
+
+}
+
 #' Predict from the Fitted Object or File
 #'
 #' @param fit List of fit object returned from multisnpnet.
@@ -513,7 +526,7 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
     }
   }
 
-  vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0(zstdcat_path, ' ', paste0(new_genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
+  vars <- dplyr::mutate(read_pvar(new_genotype_file, zstdcat_path), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
   pvar <- pgenlibr::NewPvar(paste0(new_genotype_file, '.pvar.zst'))
   chr <- list()
   for (split in split_name) {
@@ -856,6 +869,149 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
   out
 }
 
+#' Get the path of the R data file
+#'
+#' @param results_dir The results directory.
+#' @param idx Lambda index
+#'
+#' @export
+get_rdata_path <- function(results_dir, idx){
+    return(file.path(results_dir, paste0("output_lambda_", idx, ".RData")))
+}
+
+#' Get the index of the previous iteration in a specified results directory
+#'
+#' @param results_dir The results directory.
+#' @param nlambda The maximum number of lambda
+#'
+#' @export
+find_prev_iter <- function(results_dir, nlambda = 100){
+    prev_iter <- 0
+    for (idx in 1:nlambda) {
+        if (file.exists(get_rdata_path(results_dir, idx))) prev_iter <- idx
+    }
+    return(prev_iter)
+}
+
+
+
+#' Extract the non-zero coefficients from the fit object
+#'
+#' Extract the coefficients (C) from the fit object where the coefficient has at least one non-zero entry across the response variables
+#'
+#' @param fit_obj A named list containing the results of the multisnpnet results.
+#'
+#' @export
+get_non_zero_coefficients <- function(fit_obj){
+  return(fit_obj$C[apply(fit_obj$C,1,function(x){! all(x == 0)}), ])
+}
+
+#' Extract the non-zero coefficients from the fit object and return it as a data frame
+#'
+#' Extract the coefficients (C) from the fit object where the coefficient has at least one non-zero entry across the response variables. The function also reads the pvar file so that the resulting data frame has the chromosomal position of the genetic variants.
+#'
+#' @param fit_obj A named list containing the results of the multisnpnet results.
+#' @param genotype_file Path to the new suite of genotype files. genotype_file.pvar.zst must exist.
+#' @param zstdcat_path Path to zstdcat program, needed when loading variants.
+#'
+#' @export
+get_non_zero_coefficients_as_data_frame <- function(fit_obj, genotype_file, zstdcat_path = 'zstd'){
+  return(inner_join(
+    read_pvar(genotype_file, zstdcat_path),
+    select(
+        mutate(
+            separate(
+                rownames_to_column(as.data.frame(as.matrix(get_non_zero_coefficients(fit_obj))), 'ID_ALT'),
+                "ID_ALT", c("ID_ALT1", "ID_ALT2", "ALT"), sep = "_", extra='merge', fill='left', remove=T
+            ),
+            ID = if_else(is.na(ID_ALT1), ID_ALT2, paste(ID_ALT1, ID_ALT2, sep='_'))
+        ), -ID_ALT1, -ID_ALT2
+    ),
+    by = c("ID", "ALT")
+  ))
+}
+
+
+#' Compute the TSVD of the regression coefficient
+#'
+#' Compute the TSVD of the regression coefficient C and set colnames and rownames in the decomposed matrices.
+#'
+#' @param fit_obj A named list containing the results of the multisnpnet results.
+#' @param component_prefix A string used as a prefix for the column names corresponding to the latent variables
+#' @param rank Desired rank of the decomposed matrices
+#'
+#' @export
+tsvd_of_C_with_names <- function(fit_obj, component_prefix='Component', rank=NULL){
+  if(is.null(rank)){
+    rank <- min(dim(fit_obj$C))
+  }
+  svd_of_C <- svd(t(as.matrix(get_non_zero_coefficients(fit_obj))), nu = rank, nv = rank)
+  svd_of_C$d <- svd_of_C$d[1:rank]
+  svd_of_C$d <- setNames(svd_of_C$d, paste0(component_prefix, 1:length(svd_of_C$d)))
+  colnames(svd_of_C$v) <- names(svd_of_C$d)
+  colnames(svd_of_C$u) <- names(svd_of_C$d)
+  rownames(svd_of_C$v) <- rownames(fit_obj$C)
+  rownames(svd_of_C$u) <- colnames(fit_obj$C)
+  return(svd_of_C)
+}
+
+
+#' Compute the contribution scores
+#'
+#' Compute the relative importance traits (or variants) for each component as defined in Tanigawa et al Nat Comm 2019.
+#'
+#' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit).
+#'   Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.
+#' @param right_singular_vectors An indicator variable to specify if we compute the score for right singular vector or not. If true, we compute the variant squared cosine score. If false, we compute phenotype squared cosine score.
+#'
+#' @importFrom magrittr '%>%'
+#' @importFrom tibble rownames_to_column
+#' @importFrom tidyr gather
+#'
+#' @export
+score_contribution <- function(svd_obj, right_singular_vectors=FALSE){
+  if(right_singular_vectors){
+    singular_vectors <- svd_obj$v
+  }else{
+      singular_vectors <- svd_obj$u
+  }
+  (singular_vectors ** 2) %>%
+  as.data.frame() %>% rownames_to_column() %>%
+  gather(component, contribution_score, -rowname)
+}
+
+
+#' Compute the squared cosine scores
+#'
+#' Compute the relative importance of components for each trait (or variant) as defined in Tanigawa et al Nat Comm 2019.
+#'
+#' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit).
+#'   Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.
+#' @param right_singular_vectors An indicator variable to specify if we compute the score for right singular vector or not. If true, we compute the variant squared cosine score. If false, we compute phenotype squared cosine score.
+#' @param component_prefix A string used as a prefix for the column names corresponding to the latent variables
+#'
+#' @importFrom magrittr '%>%'
+#' @importFrom tibble rownames_to_column
+#' @importFrom tidyr gather
+#' @importFrom dplyr mutate
+#'
+#' @export
+score_squared_cosine <- function(svd_obj, right_singular_vectors=FALSE, component_prefix='Component'){
+  if(right_singular_vectors){
+    singular_vectors <- svd_obj$v
+  }else{
+      singular_vectors <- svd_obj$u
+  }
+
+  ((((singular_vectors) %*% diag(svd_obj$d)) ** 2) / rowSums(((singular_vectors) %*% diag(svd_obj$d)) ** 2)) %>%
+  as.data.frame() %>% rownames_to_column() %>%
+  gather(component, squared_cosine_score, -rowname) %>%
+  mutate(component = str_replace(component, '^V', component_prefix))
+}
+
+
 #' Generate color palette
 #'
 #' @param key An optional argument to select a specific color in palette.
@@ -878,13 +1034,14 @@ get_cb_colors <- function(key=NULL){
   }
 }
 
+
 #' Make biplots of the multisnpnet results
 #'
 #' Generate biplot visualization based on the decomposed coefficient matrix C.
 #' One of the most common use case is: plot_biplot(svd(t(fit$C)), label=list('phenotype'=rownames(A_init), 'variant'=rownames(fit$C)))
 #'
 #' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
-#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)).
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit)
 #'   Please note that this function assumes svd_obj$u and svd_obj$v corresponds to phenotypes and variants, respectively.
 #' @param component A named list that specifies the index of the components used in the plot.
 #' @param label A named list that specifies the phenotype and variant labels.
