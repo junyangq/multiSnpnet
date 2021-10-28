@@ -255,7 +255,7 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
     residuals <- Y - Y_new
     obj_values[k] <- 1/(2*n) * sum((residuals)^2) +
       lambda * sum(row_norm2(B))
-    
+
     if (converge_type == "params") {
       if (k > 1 && (sqrt(sum((C_old - C)^2)) < thresh*sqrt(sum(C^2)))) {
         message <- "Converged"
@@ -272,7 +272,7 @@ SRRR_iterative_missing_covariates <- function(X, Y, Y_missing, Z, PZ, lambda, r,
       }
     }
   }
-  
+
   end_BAY <- Sys.time()
   cat("Finish B-A-Y iteration: ", message, " after ", k, " iterations. ", "Time elapsed: ",
       time_diff(start_BAY, end_BAY), "\n", sep = "")
@@ -942,16 +942,17 @@ get_non_zero_coefficients_as_data_frame <- function(fit_obj, genotype_file, zstd
 #'
 #' @export
 tsvd_of_C_with_names <- function(fit_obj, component_prefix='Component', rank=NULL){
+  non_zero_C <- get_non_zero_coefficients(fit_obj)
   if(is.null(rank)){
-    rank <- min(dim(fit_obj$C))
+    rank <- min(dim(non_zero_C))
   }
-  svd_of_C <- svd(t(as.matrix(get_non_zero_coefficients(fit_obj))), nu = rank, nv = rank)
+  svd_of_C <- svd(t(as.matrix(non_zero_C)), nu = rank, nv = rank)
   svd_of_C$d <- svd_of_C$d[1:rank]
   svd_of_C$d <- setNames(svd_of_C$d, paste0(component_prefix, 1:length(svd_of_C$d)))
   colnames(svd_of_C$v) <- names(svd_of_C$d)
   colnames(svd_of_C$u) <- names(svd_of_C$d)
-  rownames(svd_of_C$v) <- rownames(fit_obj$C)
-  rownames(svd_of_C$u) <- colnames(fit_obj$C)
+  rownames(svd_of_C$v) <- rownames(non_zero_C)
+  rownames(svd_of_C$u) <- colnames(non_zero_C)
   return(svd_of_C)
 }
 
