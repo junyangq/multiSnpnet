@@ -869,6 +869,7 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
   out
 }
 
+
 #' Get the path of the R data file
 #'
 #' @param results_dir The results directory.
@@ -878,6 +879,7 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
 get_rdata_path <- function(results_dir, idx){
     return(file.path(results_dir, paste0("output_lambda_", idx, ".RData")))
 }
+
 
 #' Get the index of the previous iteration in a specified results directory
 #'
@@ -894,6 +896,25 @@ find_prev_iter <- function(results_dir, nlambda = 100){
 }
 
 
+#' Given a matrix, return non-NA lines
+#'
+#' @param M matrix
+#'
+#' @export
+get_non_NA_lines <- function(M){
+  M[apply(M, 1, function(x){all(! is.na(x))}), ]
+}
+
+
+#' Given a matrix, return lines with non-zero entries
+#'
+#' @param M matrix
+#'
+#' @export
+get_non_zero_lines <- function(M){
+  M[apply(M, 1, function(x){! all(x == 0)}), ]
+}
+
 
 #' Extract the non-zero coefficients from the fit object
 #'
@@ -903,7 +924,7 @@ find_prev_iter <- function(results_dir, nlambda = 100){
 #'
 #' @export
 get_non_zero_coefficients <- function(fit_obj){
-  return(fit_obj$C[apply(fit_obj$C,1,function(x){! all(x == 0)}), ])
+  return(get_non_zero_lines(fit_obj$C))
 }
 
 #' Extract the non-zero coefficients from the fit object and return it as a data frame
