@@ -954,26 +954,29 @@ check_if_metric_exists <- function(multiSnpnetResults, metric_name){
 }
 
 
-#' Select the "best" lambda index given the training (and validation) set metrics
+#' Extract weighted metrics
 #'
 #' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
+#' @param metric_name The types of metrics (optional)
+#' @param weight The trait weights (optional)
 #'
-#' @return An integer denoting the best lambda index. If the validation set is available (by running check_if_metric_exists()), we return the lambda index that maximizes the validation set metric. If the AUC_val is availale, we use AUC_val instead of metric_val. We take the weighted average of the metric.
+#' @return A matrix of metrics (one of the followings: AUC_val, metric_val, AUC_train, and metric_train)
 #'
-find_best_lambda_index <- function(multiSnpnetResults){
+extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, weight = NULL){
+    if(is.null(metric_name)){
+        if(       check_if_metric_exists(multiSnpnetResults, 'AUC_val') ){
+            metric_name <- 'AUC_val'
+        }else if( check_if_metric_exists(multiSnpnetResults, 'metric_val') ){
+            metric_name <- 'metric_val'
+        }else if( check_if_metric_exists(multiSnpnetResults, 'AUC_train') ){
+            metric_name <- 'AUC_train'
+        }else{
+            metric_name <- 'metric_train'
+        }
+    }
+    message(sprintf('metric: %s', metric_name))
 
-    if(! check_if_metric_exists(multiSnpnetResults, 'metric_val')){
-        lambda_index <- nrow(
-            get_non_NA_lines(multiSnpnetResults[['metric_val']])
-        )
-    }else{
-        # select the lambda index
-        val_metric <- ifelse(
-            check_if_metric_exists(multiSnpnetResults, 'AUC_val'),
-            'AUC_val',
-            'metric_val'
-        )
-
+    if(is.null(weight)){
         # get trait weights
         if('weight' %in% names(multiSnpnetResults)){
             weight <- multiSnpnetResults[['weight']]
@@ -984,15 +987,36 @@ find_best_lambda_index <- function(multiSnpnetResults){
             weight <- multiSnpnetResults[['configs']][['weight']]
         }else{
             weight <- rep(1, ncol(
-                get_non_NA_lines(multiSnpnetResults[[val_metric]])
+                get_non_NA_lines(multiSnpnetResults[[metric_name]])
             ))
         }
+    }
+    metric_mat <- multiSnpnetResults[[metric_name]]
+    for(col_idx in seq_along(ncol)){
+        metric_mat[, col_idx] <- metric_mat[, col_idx] * weight[col_idx]
+    }
+    return(metric_mat)
+}
 
-        # take argmax
+
+#' Select the "best" lambda index given the training (and validation) set metrics
+#'
+#' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
+#'
+#' @return An integer denoting the best lambda index. If the validation set is available (by running check_if_metric_exists()), we return the lambda index that maximizes the validation set metric. If the AUC_val is availale, we use AUC_val instead of metric_val. We take the weighted average of the metric.
+#'
+find_best_lambda_index <- function(multiSnpnetResults){
+    if(! check_if_metric_exists(multiSnpnetResults, 'metric_val')){
+        # validation set metric is not available, meaning we only have the training set
+        lambda_index <- nrow(
+            get_non_NA_lines(multiSnpnetResults[['metric_train']])
+        )
+    }else{
+        # select the lambda index by taking the argmax
         lambda_idx <- which.max(rowMeans(
-            get_non_NA_lines(
-                multiSnpnetResults[[val_metric]]
-            ) * weight
+            extract_weighted_metrics(
+                multiSnpnetResults
+            )
         ))
     }
     return(lambda_idx)
