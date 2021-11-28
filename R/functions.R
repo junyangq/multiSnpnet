@@ -877,7 +877,7 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
 #'
 #' @export
 get_rdata_path <- function(results_dir, idx){
-    return(file.path(results_dir, paste0("output_lambda_", idx, ".RData")))
+  return(file.path(results_dir, paste0("output_lambda_", idx, ".RData")))
 }
 
 
@@ -888,11 +888,11 @@ get_rdata_path <- function(results_dir, idx){
 #'
 #' @export
 find_prev_iter <- function(results_dir, nlambda = 100){
-    prev_iter <- 0
-    for (idx in 1:nlambda) {
-        if (file.exists(get_rdata_path(results_dir, idx))) prev_iter <- idx
-    }
-    return(prev_iter)
+  prev_iter <- 0
+  for (idx in 1:nlambda) {
+    if (file.exists(get_rdata_path(results_dir, idx))) prev_iter <- idx
+  }
+  return(prev_iter)
 }
 
 
@@ -922,14 +922,14 @@ get_non_zero_lines <- function(M){
 #' @export
 #'
 load_multiSnpnetRdata <- function(results_dir, lambda_idx = NULL){
-    if(is.null(lambda_idx)){
-        lambda_idx <- find_prev_iter(results_dir, nlambda = 200)
-    }
-    # load the data at the specified lambda idx
-    e_lambda_idx <- new.env()
-    message(sprintf('loading lambda_idx = %d in %s', lambda_idx, results_dir))
-    load(get_rdata_path(results_dir, lambda_idx), envir = e_lambda_idx)
-    return(e_lambda_idx)
+  if(is.null(lambda_idx)){
+    lambda_idx <- find_prev_iter(results_dir, nlambda = 200)
+  }
+  # load the data at the specified lambda idx
+  e_lambda_idx <- new.env()
+  message(sprintf('loading lambda_idx = %d in %s', lambda_idx, results_dir))
+  load(get_rdata_path(results_dir, lambda_idx), envir = e_lambda_idx)
+  return(e_lambda_idx)
 }
 
 
@@ -947,10 +947,10 @@ load_multiSnpnetRdata <- function(results_dir, lambda_idx = NULL){
 #' @export
 #'
 check_if_metric_exists <- function(multiSnpnetResults, metric_name){
-    return(
-        (metric_name %in% names(multiSnpnetResults)) &&
-        (all(is.numeric(multiSnpnetResults[[metric_name]])))
-    )
+  return(
+    (metric_name %in% names(multiSnpnetResults)) &&
+    (all(is.numeric(multiSnpnetResults[[metric_name]])))
+  )
 }
 
 
@@ -963,39 +963,39 @@ check_if_metric_exists <- function(multiSnpnetResults, metric_name){
 #' @return A matrix of metrics (one of the followings: AUC_val, metric_val, AUC_train, and metric_train)
 #'
 extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, weight = NULL){
-    if(is.null(metric_name)){
-        if(       check_if_metric_exists(multiSnpnetResults, 'AUC_val') ){
-            metric_name <- 'AUC_val'
-        }else if( check_if_metric_exists(multiSnpnetResults, 'metric_val') ){
-            metric_name <- 'metric_val'
-        }else if( check_if_metric_exists(multiSnpnetResults, 'AUC_train') ){
-            metric_name <- 'AUC_train'
-        }else{
-            metric_name <- 'metric_train'
-        }
-        message(sprintf('metric: %s', metric_name))
+  if(is.null(metric_name)){
+    if(       check_if_metric_exists(multiSnpnetResults, 'AUC_val') ){
+      metric_name <- 'AUC_val'
+    }else if( check_if_metric_exists(multiSnpnetResults, 'metric_val') ){
+      metric_name <- 'metric_val'
+    }else if( check_if_metric_exists(multiSnpnetResults, 'AUC_train') ){
+      metric_name <- 'AUC_train'
+    }else{
+      metric_name <- 'metric_train'
     }
+    message(sprintf('metric: %s', metric_name))
+  }
 
-    if(is.null(weight)){
-        # get trait weights
-        if('weight' %in% names(multiSnpnetResults)){
-            weight <- multiSnpnetResults[['weight']]
-        }else if(
-            ('configs' %in% names(multiSnpnetResults)) &&
-            ('weight' %in% names(multiSnpnetResults[['configs']]))
-        ){
-            weight <- multiSnpnetResults[['configs']][['weight']]
-        }else{
-            weight <- rep(1, ncol(
-                get_non_NA_lines(multiSnpnetResults[[metric_name]])
-            ))
-        }
+  if(is.null(weight)){
+    # get trait weights
+    if('weight' %in% names(multiSnpnetResults)){
+      weight <- multiSnpnetResults[['weight']]
+    }else if(
+      ('configs' %in% names(multiSnpnetResults)) &&
+      ('weight' %in% names(multiSnpnetResults[['configs']]))
+    ){
+      weight <- multiSnpnetResults[['configs']][['weight']]
+    }else{
+      weight <- rep(1, ncol(
+        get_non_NA_lines(multiSnpnetResults[[metric_name]])
+      ))
     }
-    metric_mat <- multiSnpnetResults[[metric_name]]
-    for(col_idx in seq_along(ncol)){
-        metric_mat[, col_idx] <- metric_mat[, col_idx] * weight[col_idx]
-    }
-    return(metric_mat)
+  }
+  metric_mat <- multiSnpnetResults[[metric_name]]
+  for(col_idx in seq_along(ncol)){
+    metric_mat[, col_idx] <- metric_mat[, col_idx] * weight[col_idx]
+  }
+  return(metric_mat)
 }
 
 
@@ -1006,22 +1006,22 @@ extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, wei
 #' @return An integer denoting the best lambda index. If the validation set is available (by running check_if_metric_exists()), we return the lambda index that maximizes the validation set metric. If the AUC_val is availale, we use AUC_val instead of metric_val. We take the weighted average of the metric.
 #'
 find_best_lambda_index <- function(multiSnpnetResults){
-    if('lambda_idx' %in% names(multiSnpnetResults)){
-        lambda_idx <- multiSnpnetResults[['lambda_idx']]
-    }else if(! check_if_metric_exists(multiSnpnetResults, 'metric_val')){
-        # validation set metric is not available, meaning we only have the training set
-        lambda_idx <- nrow(
-            get_non_NA_lines(multiSnpnetResults[['metric_train']])
-        )
-    }else{
-        # select the lambda index by taking the argmax
-        lambda_idx <- which.max(rowMeans(
-            extract_weighted_metrics(
-                multiSnpnetResults
-            )
-        ))
-    }
-    return(lambda_idx)
+  if('lambda_idx' %in% names(multiSnpnetResults)){
+    lambda_idx <- multiSnpnetResults[['lambda_idx']]
+  }else if(! check_if_metric_exists(multiSnpnetResults, 'metric_val')){
+    # validation set metric is not available, meaning we only have the training set
+    lambda_idx <- nrow(
+      get_non_NA_lines(multiSnpnetResults[['metric_train']])
+    )
+  }else{
+    # select the lambda index by taking the argmax
+    lambda_idx <- which.max(rowMeans(
+      extract_weighted_metrics(
+        multiSnpnetResults
+      )
+    ))
+  }
+  return(lambda_idx)
 }
 
 
@@ -1035,42 +1035,44 @@ find_best_lambda_index <- function(multiSnpnetResults){
 #' @export
 #'
 load_multiSnpnetResults <- function(results_dir, last_lambda_idx = NULL){
-    if(is.null(last_lambda_idx)){
-        last_lambda_idx <- find_prev_iter(results_dir, nlambda = 200)
-    }
-    # load the data at the last lambda idx
-    e_last_lambda_idx <- load_multiSnpnetRdata(results_dir, last_lambda_idx)
+  if(is.null(last_lambda_idx)){
+    last_lambda_idx <- find_prev_iter(results_dir, nlambda = 200)
+  }
+  # load the data at the last lambda idx
+  e_last_lambda_idx <- load_multiSnpnetRdata(results_dir, last_lambda_idx)
 
-    # copy the relevant metrics
-    multiSnpnetResults <- list()
-    for(metric_name in c('metric_train', 'metric_val', 'AUC_train', 'AUC_val')){
-        if(check_if_metric_exists(e_last_lambda_idx, metric_name)){
-            multiSnpnetResults[[metric_name]] <- e_last_lambda_idx[[metric_name]][1:last_lambda_idx, ]
-        }
+  # copy the relevant metrics
+  multiSnpnetResults <- list()
+  for(metric_name in c('metric_train', 'metric_val', 'AUC_train', 'AUC_val')){
+    if(check_if_metric_exists(e_last_lambda_idx, metric_name)){
+      multiSnpnetResults[[metric_name]] <- as.matrix(e_last_lambda_idx[[metric_name]][1:last_lambda_idx, ])
     }
-    for(obj_name in c('configs')){
-        if(obj_name %in% names(e_last_lambda_idx)){
-            multiSnpnetResults[[obj_name]] <- e_last_lambda_idx[[obj_name]]
-        }
+  }
+  for(obj_name in c('configs')){
+    if(obj_name %in% names(e_last_lambda_idx)){
+      multiSnpnetResults[[obj_name]] <- e_last_lambda_idx[[obj_name]]
     }
-    lambda_idx <- find_best_lambda_index(multiSnpnetResults)
-    multiSnpnetResults[['lambda_idx']] <- lambda_idx
+  }
+  lambda_idx <- find_best_lambda_index(multiSnpnetResults)
+  multiSnpnetResults[['lambda_idx']] <- lambda_idx
 
-    if(lambda_idx == last_lambda_idx){
-        e_lambda_idx <- e_last_lambda_idx
-    }else{
-        e_lambda_idx <- load_multiSnpnetRdata(results_dir, lambda_idx)
+  if(lambda_idx == last_lambda_idx){
+    e_lambda_idx <- e_last_lambda_idx
+  }else{
+    e_lambda_idx <- load_multiSnpnetRdata(results_dir, lambda_idx)
+  }
+  # drop feature statistics and individual-level data
+  for(fit_obj_name in c("std_obj", "response", "residuals", "stats")){
+    if(fit_obj_name %in% names(e_lambda_idx[['fit']])){
+      e_lambda_idx[['fit']][[fit_obj_name]] <- NULL
     }
-    # drop feature statistics and individual-level data
-    for(fit_obj_name in c("std_obj", "response", "residuals", "stats")){
-        e_lambda_idx[['fit']][[fit_obj_name]] <- NULL
+  }
+  for(obj_name in c('fit', 'configs')){
+    if(obj_name %in% names(e_lambda_idx)){
+      multiSnpnetResults[[obj_name]] <- e_lambda_idx[[obj_name]]
     }
-    for(obj_name in c('fit', 'configs')){
-        if(obj_name %in% names(e_lambda_idx)){
-            multiSnpnetResults[[obj_name]] <- e_lambda_idx[[obj_name]]
-        }
-    }
-    return(multiSnpnetResults)
+  }
+  return(multiSnpnetResults)
 }
 
 
@@ -1089,10 +1091,10 @@ load_multiSnpnetResults <- function(results_dir, last_lambda_idx = NULL){
 #' @export
 #'
 read_lambda_sequence_from_multiSnpnetResults <- function(multiSnpnetResults, lambda_idx = NULL){
-    if(is.null(lambda_idx)){
-       lambda_idx <- find_best_lambda_index(multiSnpnetResults)
-    }
-    multiSnpnetResults[['configs']][['lambda']][1:lambda_idx]
+  if(is.null(lambda_idx)){
+    lambda_idx <- find_best_lambda_index(multiSnpnetResults)
+  }
+  multiSnpnetResults[['configs']][['lambda']][1:lambda_idx]
 }
 
 #' Tabulate the best lambda index
@@ -1113,37 +1115,36 @@ read_lambda_sequence_from_multiSnpnetResults <- function(multiSnpnetResults, lam
 get_summary_metrics <- function(
     multiSnpnetResults, metrics = c('metric_train', 'metric_val', 'AUC_train', 'AUC_val'), lambda_idx = NULL
 ){
-    if(is.null(lambda_idx)){
-       lambda_idx <- find_best_lambda_index(multiSnpnetResults)
-    }
-    metrics_list <- setNames(
-        lapply(metrics, function(metric_name){
-            if(check_if_metric_exists(multiSnpnetResults, metric_name)){
-                rowMeans(
-                    extract_weighted_metrics(multiSnpnetResults, metric_name)
-                )[lambda_idx]
-            }else{
-                NA
-            }
-        }),
-        metrics
+  if(is.null(lambda_idx)){
+    lambda_idx <- find_best_lambda_index(multiSnpnetResults)
+  }
+  metrics_list <- setNames(
+    lapply(metrics, function(metric_name){
+      if(check_if_metric_exists(multiSnpnetResults, metric_name)){
+        rowMeans(
+          extract_weighted_metrics(multiSnpnetResults, metric_name)
+        )[lambda_idx]
+      }else{
+        NA
+      }
+    }),
+    metrics
+  )
+  return(bind_cols(
+    mutate(
+      data.frame(
+        best_lambda_idx = lambda_idx,
+        last_lambda_idx = nrow(multiSnpnetResults[['metric_train']]),
+        n_variables = nrow(get_non_zero_coefficients(multiSnpnetResults[['fit']]))
+      ),
+      across(everything(), as.integer)
+    ),
+    mutate(
+      as.data.frame(metrics_list),
+      across(everything(), as.numeric)
     )
-    return(bind_cols(
-        mutate(
-          data.frame(
-            best_lambda_idx = lambda_idx,
-            last_lambda_idx = nrow(multiSnpnetResults[['metric_train']]),
-            n_variables = nrow(get_non_zero_coefficients(multiSnpnetResults[['fit']]))
-          ),
-          across(everything(), as.integer)
-        ),
-        mutate(
-          as.data.frame(metrics_list),
-          across(everything(), as.numeric)
-        )
-    ))
+  ))
 }
-
 
 
 #' Extract the non-zero coefficients from the fit object
@@ -1156,6 +1157,7 @@ get_summary_metrics <- function(
 get_non_zero_coefficients <- function(fit_obj){
   return(get_non_zero_lines(fit_obj$C))
 }
+
 
 #' Extract the non-zero coefficients from the fit object and return it as a data frame
 #'
@@ -1287,10 +1289,43 @@ get_cb_colors <- function(key=NULL){
 }
 
 
+#' Generate a scree plot visualization based on the decomposed coefficient matrix C.
+#'
+#' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
+#'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit)
+#'
+#' @import ggplot2
+#' @importFrom magrittr '%>%'
+#' @importFrom dplyr mutate
+#' @importFrom tibble enframe
+#' @examples
+#' plot_scree( tsvd_of_C_with_names(fit, rank = 10) )
+#'
+#' @export
+plot_scree <- function(svd_obj) {
+  svd_obj$d %>%
+  enframe %>%
+  mutate(
+    Component = as.integer(str_replace(name, "Component", "")),
+    variance_explained = value ** 2 / sum(value ** 2),
+  ) %>%
+  ggplot(aes(
+    x = as.factor(Component),
+    y = variance_explained
+  )) +
+  geom_point() +
+  theme_bw(base_size = 16) +
+  labs(
+    title = 'Scree plot',
+    x = 'Component',
+    y = 'Relative variance explained'
+  )
+}
+
+
 #' Make biplots of the multisnpnet results
 #'
 #' Generate biplot visualization based on the decomposed coefficient matrix C.
-#' One of the most common use case is: plot_biplot(svd(t(fit$C)), label=list('phenotype'=rownames(A_init), 'variant'=rownames(fit$C)))
 #'
 #' @param svd_obj A named list containing three matrices with u, d, and v as their names as in the
 #'   output from base::svd() function. One can pass the results of base::svd(t(fit$C)) or tsvd_of_C_with_names(fit)
@@ -1309,6 +1344,9 @@ get_cb_colors <- function(key=NULL){
 #' @importFrom magrittr '%>%'
 #' @importFrom tibble rownames_to_column
 #' @importFrom dplyr rename select mutate if_else bind_rows
+#'
+#' @examples
+#' plot_biplot(svd(t(fit$C)), label=list('phenotype'=rownames(A_init), 'variant'=rownames(fit$C)))
 #'
 #' @export
 plot_biplot <- function(svd_obj, component=list('x'=1, 'y'=2),
