@@ -973,8 +973,8 @@ extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, wei
         }else{
             metric_name <- 'metric_train'
         }
+        message(sprintf('metric: %s', metric_name))
     }
-    message(sprintf('metric: %s', metric_name))
 
     if(is.null(weight)){
         # get trait weights
@@ -1006,9 +1006,11 @@ extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, wei
 #' @return An integer denoting the best lambda index. If the validation set is available (by running check_if_metric_exists()), we return the lambda index that maximizes the validation set metric. If the AUC_val is availale, we use AUC_val instead of metric_val. We take the weighted average of the metric.
 #'
 find_best_lambda_index <- function(multiSnpnetResults){
-    if(! check_if_metric_exists(multiSnpnetResults, 'metric_val')){
+    if('lambda_idx' %in% names(multiSnpnetResults)){
+        lambda_idx <- multiSnpnetResults[['lambda_idx']]
+    }else if(! check_if_metric_exists(multiSnpnetResults, 'metric_val')){
         # validation set metric is not available, meaning we only have the training set
-        lambda_index <- nrow(
+        lambda_idx <- nrow(
             get_non_NA_lines(multiSnpnetResults[['metric_train']])
         )
     }else{
@@ -1052,6 +1054,7 @@ load_multiSnpnetResults <- function(results_dir, last_lambda_idx = NULL){
         }
     }
     lambda_idx <- find_best_lambda_index(multiSnpnetResults)
+    multiSnpnetResults[['lambda_idx']] <- lambda_idx
 
     if(lambda_idx == last_lambda_idx){
         e_lambda_idx <- e_last_lambda_idx
@@ -1067,9 +1070,80 @@ load_multiSnpnetResults <- function(results_dir, last_lambda_idx = NULL){
             multiSnpnetResults[[obj_name]] <- e_lambda_idx[[obj_name]]
         }
     }
-    multiSnpnetResults[['lambda_idx']] <- lambda_idx
     return(multiSnpnetResults)
 }
+
+
+#' Read the lambda sequence from the initial fit with a validation set
+#'
+#' For the path to a multiSnpnet results directory (saved from a multiSnpnet run with a validation set),
+#' identify the last "previous" iteration, identify the best lambda based on the validation set AUC,
+#' and load the lambda sequence stored in the RData file and return the lambda sequence.
+#' This is useful for performing a "refit" using a combined set of training + validation set.
+#'
+#' @param results_dir The results directory
+#' @param lambda_idx The lambda index. If not specified, we call find_best_lambda_index()
+#'
+#' @return A lambda sequence
+#'
+#' @export
+#'
+read_lambda_sequence_from_multiSnpnetResults <- function(multiSnpnetResults, lambda_idx = NULL){
+    if(is.null(lambda_idx)){
+       lambda_idx <- find_best_lambda_index(multiSnpnetResults)
+    }
+    multiSnpnetResults[['configs']][['lambda']][1:lambda_idx]
+}
+
+#' Tabulate the best lambda index
+#'
+#' For the path to a multiSnpnet results directory (saved from a multiSnpnet run with a validation set),
+#' identify the last "previous" iteration, identify the best lambda based on the validation set AUC,
+#' and load the lambda sequence stored in the RData file and return the lambda sequence.
+#' This is useful for performing a "refit" using a combined set of training + validation set.
+#'
+#' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
+#' @param metrics a list of metrics to include
+#' @param lambda_idx The lambda index. If not specified, we call find_best_lambda_index()
+#'
+#' @return A data frame of one row containing the lambda index (best and last), number of non-zero variables in the model, and the performance metrics at the best lambda index
+#'
+#' @export
+#'
+get_summary_metrics <- function(
+    multiSnpnetResults, metrics = c('metric_train', 'metric_val', 'AUC_train', 'AUC_val'), lambda_idx = NULL
+){
+    if(is.null(lambda_idx)){
+       lambda_idx <- find_best_lambda_index(multiSnpnetResults)
+    }
+    metrics_list <- setNames(
+        lapply(metrics, function(metric_name){
+            if(check_if_metric_exists(multiSnpnetResults, metric_name)){
+                rowMeans(
+                    extract_weighted_metrics(multiSnpnetResults, metric_name)
+                )[lambda_idx]
+            }else{
+                NA
+            }
+        }),
+        metrics
+    )
+    return(bind_cols(
+        mutate(
+          data.frame(
+            best_lambda_idx = lambda_idx,
+            last_lambda_idx = nrow(multiSnpnetResults[['metric_train']]),
+            n_variables = nrow(get_non_zero_coefficients(multiSnpnetResults[['fit']]))
+          ),
+          across(everything(), as.integer)
+        ),
+        mutate(
+          as.data.frame(metrics_list),
+          across(everything(), as.numeric)
+        )
+    ))
+}
+
 
 
 #' Extract the non-zero coefficients from the fit object
