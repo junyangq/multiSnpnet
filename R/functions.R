@@ -1091,12 +1091,20 @@ extract_all_metrics <- function(multiSnpnetResults){
 
 #' Select the "best" lambda index given the training (and validation) set metrics
 #'
+#' If the "lambda_idx" attribute in the given object is already available, simply return that value. Otherwise, we look at the performance metric and decide the "best" lambda index.
+#' If there is no validation set metric available, we simply return the last lambda index in the training set metric.
+#' When we have access to validation set metrics, we identify the lambda index that maximizes the (weighted) average of validation set metrics.
+#'
 #' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
+#' @param metric_name
+#' @param use_weight whether we should use trait weights when evaluating weighted average of the metric
+#' @param traits (optional) subset of traits
+#' @param force if TRUE, we recompute the best lambda index
 #'
 #' @return An integer denoting the best lambda index. If the validation set is available (by running check_if_metric_exists()), we return the lambda index that maximizes the validation set metric. If the AUC_val is availale, we use AUC_val instead of metric_val. We take the weighted average of the metric.
 #'
-find_best_lambda_index <- function(multiSnpnetResults){
-  if('lambda_idx' %in% names(multiSnpnetResults)){
+find_best_lambda_index <- function(multiSnpnetResults, metric_name = NULL, use_weight = TRUE, traits = NULL, force = FALSE){
+  if((!force) && ('lambda_idx' %in% names(multiSnpnetResults))){
     lambda_idx <- multiSnpnetResults[['lambda_idx']]
   }else if(! check_if_metric_exists(multiSnpnetResults, 'metric_val')){
     # validation set metric is not available, meaning we only have the training set
@@ -1105,11 +1113,19 @@ find_best_lambda_index <- function(multiSnpnetResults){
     )
   }else{
     # select the lambda index by taking the argmax
-    lambda_idx <- which.max(rowMeans(
-      extract_weighted_metrics(
-        multiSnpnetResults
+    if(use_weight){
+      metric_mat <- extract_weighted_metrics(
+        multiSnpnetResults, metric_name
       )
-    ))
+    }else{
+      metric_mat <- extract_metrics(
+        multiSnpnetResults, metric_name
+      )
+    }
+    if(is.null(traits)){
+      traits <- colnames(metric_mat)
+    }
+    lambda_idx <- which.max(rowMeans(as.matrix(metric_mat[, traits])))
   }
   return(lambda_idx)
 }
@@ -1124,7 +1140,7 @@ find_best_lambda_index <- function(multiSnpnetResults){
 #'
 #' @export
 #'
-load_multiSnpnetResults <- function(results_dir, last_lambda_idx = NULL){
+load_multiSnpnetResultsFromRDataFiles <- function(results_dir, last_lambda_idx = NULL){
   if(is.null(last_lambda_idx)){
     last_lambda_idx <- find_prev_iter(results_dir, nlambda = 200)
   }
@@ -1254,12 +1270,21 @@ get_non_zero_coefficients <- function(fit_obj){
 #'
 #' Extract the coefficients (C) from the fit object where the coefficient has at least one non-zero entry across the response variables. The function also reads the pvar file so that the resulting data frame has the chromosomal position of the genetic variants.
 #'
+#' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
 #' @param fit_obj A named list containing the results of the multisnpnet results.
 #' @param genotype_file Path to the new suite of genotype files. genotype_file.pvar.zst must exist.
 #' @param zstdcat_path Path to zstdcat program, needed when loading variants.
 #'
 #' @export
-get_non_zero_coefficients_as_data_frame <- function(fit_obj, genotype_file, zstdcat_path = 'zstd'){
+get_non_zero_coefficients_as_data_frame <- function(multiSnpnetResults = NULL, fit_obj = NULL, genotype_file = NULL, zstdcat_path = 'zstdcat'){
+  if(!is.null(multiSnpnetResults)){
+    if(is.null(fit_obj)){
+      fit_obj <- multiSnpnetResults[['fit']]
+    }
+    if(is.null(genotype_file)){
+      genotype_file <- multiSnpnetResults[['configs']][['genotype_file']]
+    }
+  }
   return(inner_join(
     read_pvar(genotype_file, zstdcat_path),
     select(
