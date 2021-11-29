@@ -870,6 +870,36 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
 }
 
 
+#' Check if the early stopping condition is satisfied
+#'
+#' @param ilam Lambda index
+#' @param metric_val Validation set metric
+#' @param AUC_val Validation set AUC
+#' @param traits (optional) subset of traits
+#'
+#' @export
+check_early_stopping_condition <- function(ilam, metric_val, AUC_val = NULL, traits = NULL){
+  if(is.null(traits)){
+    traits <- colnames(metric_val)
+  }
+  if(is.null(AUC_val) || ncol(AUC_val) == 0){
+    return(
+      ilam > 2 &&
+      all(metric_val[ilam,   traits] < metric_val[ilam-1, traits]) &&
+      all(metric_val[ilam-1, traits] < metric_val[ilam-2, traits])
+    )
+  }else{
+    return(
+      ilam > 2 &&
+      all(metric_val[ilam,   traits] < metric_val[ilam-1, traits]) &&
+      all(metric_val[ilam-1, traits] < metric_val[ilam-2, traits]) &&
+      all(AUC_val[   ilam,   traits] < AUC_val[   ilam-1, traits]) &&
+      all(AUC_val[   ilam-1, traits] < AUC_val[   ilam-2, traits])
+    )
+  }
+}
+
+
 #' Get the path of the R data file
 #'
 #' @param results_dir The results directory.
