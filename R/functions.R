@@ -460,6 +460,8 @@ predict_multisnpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file
       fit[[i]] <- e$fit
     }
   }
+
+  fit <- fit[!sapply(fit, is.null)]
   stats <- fit[[length(fit)]][["stats"]]
 
   weight <- fit[[length(fit)]][["weight"]]
@@ -1143,27 +1145,36 @@ find_best_lambda_index <- function(multiSnpnetResults, metric_name = NULL, use_w
 #' @return An list object containing the training (and validation) set metrics, lambda_idx, fit, and configs. We will extract the results from the "best" lambda index for fit and configs. The configs itself is a list containing important paramters such as weight (trait weight).
 #'
 prepare_multiSnpnetResults <- function(fit_list, metric_train, metric_val, AUC_train, AUC_val, configs){
-    # copy the relevant metrics
-    multiSnpnetResults <- list()
-    multiSnpnetResults[["configs"]] <- configs
-    if((!is.null(metric_train)) && (all(is.numeric(metric_train))))
-      multiSnpnetResults[["metric_train"]] <- metric_train
-    if((!is.null(metric_val))   && (all(is.numeric(metric_val))))
-      multiSnpnetResults[["metric_val"]] <- metric_val
-    if((!is.null(AUC_train)) && (all(is.numeric(AUC_train))))
-      multiSnpnetResults[["AUC_train"]] <- AUC_train
-    if((!is.null(AUC_val)) && (all(is.numeric(AUC_val))))
-      multiSnpnetResults[["AUC_val"]] <- AUC_val
-    # select the best lambda index
-    lambda_idx <- find_best_lambda_index(multiSnpnetResults)
-    multiSnpnetResults[['lambda_idx']] <- lambda_idx
-    # copy the fit object from the best lambda index
-    multiSnpnetResults[['fit']] <- fit_list[lambda_idx]
-
+  # copy the relevant metrics
+  multiSnpnetResults <- list()
+  multiSnpnetResults[["configs"]] <- configs
+  if((!is.null(metric_train)) && (all(is.numeric(metric_train))))
+    multiSnpnetResults[["metric_train"]] <- metric_train
+  if((!is.null(metric_val))   && (all(is.numeric(metric_val))))
+    multiSnpnetResults[["metric_val"]] <- metric_val
+  if((!is.null(AUC_train)) && (all(is.numeric(AUC_train))))
+    multiSnpnetResults[["AUC_train"]] <- AUC_train
+  if((!is.null(AUC_val)) && (all(is.numeric(AUC_val))))
+    multiSnpnetResults[["AUC_val"]] <- AUC_val
+  # select the best lambda index
+  lambda_idx <- find_best_lambda_index(multiSnpnetResults)
+  multiSnpnetResults[['lambda_idx']] <- lambda_idx
+  # copy the fit object from the best lambda index
+  multiSnpnetResults[['fit']] <- fit_list[lambda_idx]
   # drop feature statistics and individual-level data
   for(fit_obj_name in c("std_obj", "response", "residuals", "stats")){
     if(fit_obj_name %in% names(multiSnpnetResults[['fit']])){
       multiSnpnetResults[['fit']][[fit_obj_name]] <- NULL
+    }
+  }
+  # add the full fit sequence
+  multiSnpnetResults[['fit_list']] <- fit_list
+  # drop feature statistics and individual-level data for all but the last index
+  for(i in seq(sum(!sapply(fit_list, is.null))-1)){
+    for(fit_obj_name in c("std_obj", "response", "residuals", "stats")){
+      if(fit_obj_name %in% names(multiSnpnetResults[['fit_list']][[i]])){
+        multiSnpnetResults[['fit_list']][[i]][[fit_obj_name]] <- NULL
+      }
     }
   }
   class(multiSnpnetResults) <- "multiSnpnetResults"
@@ -1180,7 +1191,7 @@ prepare_multiSnpnetResults <- function(fit_list, metric_train, metric_val, AUC_t
 #'
 #' @export
 #'
-load_multiSnpnetResultsFromRDataFiles <- function(results_dir, last_lambda_idx = NULL){
+load_multiSnpnetResultsFromRDataFiles <- function(results_dir, last_lambda_idx = NULL, fill_sequence = FALSE){
   if(is.null(last_lambda_idx)){
     last_lambda_idx <- find_prev_iter(results_dir, nlambda = 200)
   }
@@ -1217,6 +1228,21 @@ load_multiSnpnetResultsFromRDataFiles <- function(results_dir, last_lambda_idx =
   for(obj_name in c('fit', 'configs')){
     if(obj_name %in% names(e_lambda_idx)){
       multiSnpnetResults[[obj_name]] <- e_lambda_idx[[obj_name]]
+    }
+  }
+  if(fill_sequence){
+    multiSnpnetResults[["fit_list"]] <- vector("list", last_lambda_idx)
+    for(idx in seq(last_lambda_idx)){
+      e_idx <- load_multiSnpnetRdata(results_dir, idx)
+      multiSnpnetResults[["fit_list"]][[idx]] <- e_idx[["fit"]]
+      if(idx < last_lambda_idx){
+         # drop feature statistics and individual-level data
+        for(fit_obj_name in c("std_obj", "response", "residuals", "stats")){
+          if(fit_obj_name %in% names(multiSnpnetResults[["fit_list"]][[idx]])){
+            multiSnpnetResults[["fit_list"]][[idx]][[fit_obj_name]] <- NULL
+          }
+        }
+      }
     }
   }
   class(multiSnpnetResults) <- "multiSnpnetResults"

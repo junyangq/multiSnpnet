@@ -80,7 +80,7 @@ phenotype_file <- system.file("extdata", "sample.phe", package = "multiSnpnet")
 phenotype_names <- c("QPHE", "BPHE")
 covariate_names <- c("age", "sex", paste0("PC", 1:10))
 
-fit_multisnpnet <- multisnpnet(
+multisnpnet_results <- multisnpnet(
   genotype_file = genotype_file,
   phenotype_file = phenotype_file,
   phenotype_names = phenotype_names,
@@ -95,10 +95,10 @@ fit_multisnpnet <- multisnpnet(
 ) # we hide the intermediate messages
 ```
 
-We can make prediction with the fitted object `fit_multisnpnet`. For example,
+We can make prediction with the fitted object in `multisnpnet_results`. For example,
 ```{r, warning=FALSE, message=FALSE}
 pred_multisnpnet <- predict_multisnpnet(
-  fit = fit_multisnpnet,
+  fit = multisnpnet_results$fit_list,
   new_genotype_file = genotype_file,
   new_phenotype_file = phenotype_file,
   covariate_names = covariate_names,
@@ -124,7 +124,7 @@ pred_multisnpnet$AUC
 The coefficent matrix $C$ in the returned value from `multiSnpnet::multisnpnet()` has the dimension of $p \times q$. One can visualize this matrix with a biplot visualization.
 
 ```{r}
-fit_single <- fit_multisnpnet[[10]]
+fit_single <- multisnpnet_results$fit
 if (require(ggrepel))
 plot_biplot(
   svd(t(as.matrix(fit_single$C))),
