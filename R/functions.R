@@ -954,15 +954,14 @@ check_if_metric_exists <- function(multiSnpnetResults, metric_name){
 }
 
 
-#' Extract weighted metrics
+#' Extract metrics
 #'
 #' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
 #' @param metric_name The types of metrics (optional)
-#' @param weight The trait weights (optional)
 #'
 #' @return A matrix of metrics (one of the followings: AUC_val, metric_val, AUC_train, and metric_train)
 #'
-extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, weight = NULL){
+extract_metrics <- function(multiSnpnetResults, metric_name = NULL){
   if(is.null(metric_name)){
     if(       check_if_metric_exists(multiSnpnetResults, 'AUC_val') ){
       metric_name <- 'AUC_val'
@@ -975,8 +974,17 @@ extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, wei
     }
     message(sprintf('metric: %s', metric_name))
   }
+  return(multiSnpnetResults[[metric_name]])
+}
 
-  if(is.null(weight)){
+
+#' Extract weights
+#'
+#' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
+#'
+#' @return A list of weights
+#'
+extract_weight <- function(multiSnpnetResults){
     # get trait weights
     if('weight' %in% names(multiSnpnetResults)){
       weight <- multiSnpnetResults[['weight']]
@@ -986,16 +994,68 @@ extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, wei
     ){
       weight <- multiSnpnetResults[['configs']][['weight']]
     }else{
-      weight <- rep(1, ncol(
-        get_non_NA_lines(multiSnpnetResults[[metric_name]])
-      ))
+      weight <- NULL
+    }
+    return(weight)
+}
+
+
+#' Extract weighted metrics
+#'
+#' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
+#' @param metric_name The types of metrics (optional)
+#' @param weight The trait weights (optional)
+#'
+#' @return A matrix of metrics (one of the followings: AUC_val, metric_val, AUC_train, and metric_train)
+#'
+extract_weighted_metrics <- function(multiSnpnetResults, metric_name = NULL, weight = NULL){
+  metric_mat <- extract_metrics(multiSnpnetResults, metric_name)
+  if(is.null(weight)){
+    # get trait weights
+    weight <- extract_weight(multiSnpnetResults)
+    if(is.null(weight)){
+      message("Using uniform weights")
+      weight <- rep(1, ncol(metric_mat))
     }
   }
-  metric_mat <- multiSnpnetResults[[metric_name]]
-  for(col_idx in seq_along(ncol)){
+  weight <- weight[colnames(metric_mat)]
+  weight <- weight / sum(weight)
+  for(col_idx in seq_along(ncol(metric_mat))){
     metric_mat[, col_idx] <- metric_mat[, col_idx] * weight[col_idx]
   }
   return(metric_mat)
+}
+
+
+#' Extract all weighted and unweighted metrics
+#'
+#' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
+#'
+#' @return A dataframe of all available metrics
+#'
+#' @export
+extract_all_metrics <- function(multiSnpnetResults){
+  metric_names <- c('metric_train', 'metric_val', 'AUC_train', 'AUC_val')
+  metric_names <- metric_names[
+      sapply(metric_names, function(mn){check_if_metric_exists(multiSnpnetResults, mn)})
+  ]
+  lapply(metric_names, function(metric_n){
+    bind_rows(
+      multiSnpnetResults %>%
+      extract_metrics(metric_n) %>%
+      data.frame() %>%
+      mutate(metric_name = metric_n, weighted = F) %>%
+      rownames_to_column('lambda_idx'),
+      multiSnpnetResults %>%
+      extract_weighted_metrics(metric_n) %>%
+      data.frame() %>%
+      mutate(metric_name = metric_n, weighted = T) %>%
+      rownames_to_column('lambda_idx')
+    )
+  }) %>%
+  bind_rows %>%
+  mutate(lambda_idx = as.integer(lambda_idx)) %>%
+  gather(trait, metric, -lambda_idx, -metric_name, -weighted)
 }
 
 
@@ -1046,6 +1106,7 @@ load_multiSnpnetResults <- function(results_dir, last_lambda_idx = NULL){
   for(metric_name in c('metric_train', 'metric_val', 'AUC_train', 'AUC_val')){
     if(check_if_metric_exists(e_last_lambda_idx, metric_name)){
       multiSnpnetResults[[metric_name]] <- as.matrix(e_last_lambda_idx[[metric_name]][1:last_lambda_idx, ])
+      colnames(multiSnpnetResults[[metric_name]]) <- colnames(e_last_lambda_idx[[metric_name]])
     }
   }
   for(obj_name in c('configs')){
