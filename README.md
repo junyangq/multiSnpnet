@@ -1,6 +1,6 @@
 # Fast Multi-Phenotype SRRR on Genetic Data
 
-Fit a sparse reduced rank regression model on large-scale genetic data and multivariate responses with batch variable screening and alternating minimization. It computes a full solution path on a grid of penalty values. Can deal with larger-than-memory SNP data, missing values, and confounding covariates.
+Fit a sparse reduced rank regression (SRRR) model on large-scale genetic data and multivariate responses with batch variable screening and alternating minimization. It computes a full solution path on a grid of penalty values. Our approach can deal with larger-than-memory SNP data, missing values, and confounding covariates.
 
 License: GPL-2
 
@@ -29,16 +29,16 @@ phenotype_names <- c("QPHE", "BPHE")
 covariate_names <- c("age", "sex", paste0("PC", 1:10))
 
 out <- multisnpnet(
-  genotype_file = genotype_file, 
-  phenotype_file = phenotype_file, 
-  phenotype_names = phenotype_names, 
-  covariate_names = covariate_names, 
-  rank = 2, 
-  nlambda = 10, 
+  genotype_file = genotype_file,
+  phenotype_file = phenotype_file,
+  phenotype_names = phenotype_names,
+  covariate_names = covariate_names,
+  rank = 2,
+  nlambda = 10,
   validation = TRUE,
   split_col = "split",
-  batch_size = 100, 
-  standardize_response = TRUE, 
+  batch_size = 100,
+  standardize_response = TRUE,
   save = TRUE
 )
 ```

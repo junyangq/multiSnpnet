@@ -72,6 +72,8 @@ computation).}
 \item{save}{Boolean. Whether to save intermediate results.}
 
 \item{early_stopping}{Whether to stop the process early if validation metric starts to fall.}
+
+\item{early_stopping_phenotypes}{List of phenotypes to focus when evaluating the early stopping condition.}
 }
 \description{
 Fit a sparse reduced rank regression model on large-scale SNP data and multivariate responses

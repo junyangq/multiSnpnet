@@ -38,5 +38,8 @@ labels of the data points.}
 }
 \description{
 Generate biplot visualization based on the decomposed coefficient matrix C.
-One of the most common use case is: plot_biplot(svd(t(fit$C)), label=list('phenotype'=rownames(A_init), 'variant'=rownames(fit$C)))
+}
+\examples{
+plot_biplot(svd(t(fit$C)), label=list('phenotype'=rownames(A_init), 'variant'=rownames(fit$C)))
+
 }
