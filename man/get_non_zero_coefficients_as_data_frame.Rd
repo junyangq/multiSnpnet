@@ -8,6 +8,9 @@ get_non_zero_coefficients_as_data_frame(
   multiSnpnetResults = NULL,
   fit_obj = NULL,
   genotype_file = NULL,
+  withTSVD = FALSE,
+  component_prefix = "Component",
+  rank = NULL,
   zstdcat_path = "zstdcat"
 )
 }
@@ -17,6 +20,12 @@ get_non_zero_coefficients_as_data_frame(
 \item{fit_obj}{A named list containing the results of the multisnpnet results.}
 
 \item{genotype_file}{Path to the new suite of genotype files. genotype_file.pvar.zst must exist.}
+
+\item{withTSVD}{A boolean variable indicating whether to include the SVD loadings on variants}
+
+\item{component_prefix}{(applicable when withTSVD is TRUE) the prefix of the SVD loadings column}
+
+\item{rank}{(applicable when withTSVD is TRUE) the rank of SVD}
 
 \item{zstdcat_path}{Path to zstdcat program, needed when loading variants.}
 }

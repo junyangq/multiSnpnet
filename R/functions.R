@@ -1140,7 +1140,7 @@ extract_all_metrics <- function(multiSnpnetResults){
 #' When we have access to validation set metrics, we identify the lambda index that maximizes the (weighted) average of validation set metrics.
 #'
 #' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
-#' @param metric_name
+#' @param metric_name the name of the metric (metric_val or AUC_val)
 #' @param use_weight whether we should use trait weights when evaluating weighted average of the metric
 #' @param traits (optional) subset of traits
 #' @param force if TRUE, we recompute the best lambda index
@@ -1187,12 +1187,13 @@ drop_bulky_stuff_in_fit_object <- function(fit_obj, drop_list = c("std_obj", "re
 
 #' Set the results of multiSnpnet run in a list
 #'
-#' @param fit_list
-#' @param metric_train
-#' @param metric_val
-#' @param AUC_train
-#' @param AUC_val
-#' @param configs
+#' @param fit_list fit_list that contains a series of fit across the lambda sequence
+#' @param ilam the current lambda index
+#' @param metric_train a matrix containing the metric in the training set
+#' @param metric_val a matrix containing the metric in the validation set
+#' @param AUC_train a matrix containing the AUC in the training set
+#' @param AUC_val a matrix containing the AUC in the validation set
+#' @param configs a config object (named list)
 #'
 #' @return An list object containing the training (and validation) set metrics, lambda_idx, fit, and configs. We will extract the results from the "best" lambda index for fit and configs. The configs itself is a list containing important paramters such as weight (trait weight).
 #'

@@ -15,6 +15,8 @@ find_best_lambda_index(
 \arguments{
 \item{multiSnpnetResults}{a list containing the results of the multiSnpnet fit}
 
+\item{metric_name}{the name of the metric (metric_val or AUC_val)}
+
 \item{use_weight}{whether we should use trait weights when evaluating weighted average of the metric}
 
 \item{traits}{(optional) subset of traits}

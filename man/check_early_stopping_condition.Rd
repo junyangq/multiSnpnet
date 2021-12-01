@@ -4,7 +4,15 @@
 \alias{check_early_stopping_condition}
 \title{Check if the early stopping condition is satisfied}
 \usage{
-check_early_stopping_condition(ilam, metric_val, AUC_val = NULL, traits = NULL)
+check_early_stopping_condition(
+  ilam,
+  metric_val,
+  AUC_val = NULL,
+  traits = NULL,
+  weight = NULL,
+  check_average = TRUE,
+  stopping.lag = 2
+)
 }
 \arguments{
 \item{ilam}{Lambda index}
@@ -14,7 +22,13 @@ check_early_stopping_condition(ilam, metric_val, AUC_val = NULL, traits = NULL)
 \item{AUC_val}{Validation set AUC}
 
 \item{traits}{(optional) subset of traits}
+
+\item{weight}{weights (named list) for the weighted average computation.}
+
+\item{check_average}{whether to check the average of the metrics}
+
+\item{stopping.lag}{how many iterations shall we wait after the argmax until we stop}
 }
 \description{
-Check if the early stopping condition is satisfied
+For the specified traits, we check if the validation set metric (and validation set AUC) has been decreasing in the last two steps. If also check if the average of the validation set metric and the validation set AUC has been decreasing in the last two steps. If no traits were provided, we check it for all the traits considered in SRRR.
 }

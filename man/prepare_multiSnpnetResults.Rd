@@ -6,6 +6,7 @@
 \usage{
 prepare_multiSnpnetResults(
   fit_list,
+  ilam,
   metric_train,
   metric_val,
   AUC_train,
@@ -14,7 +15,19 @@ prepare_multiSnpnetResults(
 )
 }
 \arguments{
-\item{configs}{}
+\item{fit_list}{fit_list that contains a series of fit across the lambda sequence}
+
+\item{ilam}{the current lambda index}
+
+\item{metric_train}{a matrix containing the metric in the training set}
+
+\item{metric_val}{a matrix containing the metric in the validation set}
+
+\item{AUC_train}{a matrix containing the AUC in the training set}
+
+\item{AUC_val}{a matrix containing the AUC in the validation set}
+
+\item{configs}{a config object (named list)}
 }
 \value{
 An list object containing the training (and validation) set metrics, lambda_idx, fit, and configs. We will extract the results from the "best" lambda index for fit and configs. The configs itself is a list containing important paramters such as weight (trait weight).
