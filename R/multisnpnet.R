@@ -55,6 +55,7 @@
 #' @param save Boolean. Whether to save intermediate results.
 #' @param early_stopping Whether to stop the process early if validation metric starts to fall.
 #' @param early_stopping_phenotypes List of phenotypes to focus when evaluating the early stopping condition.
+#' @param early_stopping_check_average whether to check the average metric when evaluating the early stopping condition
 #'
 #' @importFrom data.table ':='
 #' @importFrom magrittr '%>%'
@@ -64,7 +65,7 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
                         rank, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), standardize_response = TRUE,
                         weight = NULL, p.factor = NULL, validation = FALSE, split_col = NULL, mem = NULL,
                         batch_size = 100, prev_iter = 0, max.iter = 10, configs = list(), save = TRUE,
-                        early_stopping = FALSE, early_stopping_phenotypes = NULL) {
+                        early_stopping = FALSE, early_stopping_phenotypes = NULL, early_stopping_check_average = TRUE) {
 
   configs <- setupMultiConfigs(configs, genotype_file, phenotype_file, phenotype_names, covariate_names,
                                nlambda, mem, standardize_response, max.iter, rank, prev_iter, batch_size, save)
@@ -72,6 +73,8 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   start_all <- Sys.time()
 
   if (rank > length(phenotype_names)) stop("The specified rank (", rank, ") should not be greater than the number of responses (", length(phenotype_names), ").")
+
+  if(all(sapply(early_stopping_phenotypes, function(p){p %in% phenotype_names}))) stop(sprintf("Some of the specified early stopping phenotypes does not match the phenotype names: %s", paste(early_stopping_phenotypes[! sapply(early_stopping_phenotypes, function(p){p %in% phenotype_names})], collapse = ', ') ))
 
   cat("Start Sparse Reduced Rank Regression for ", paste(phenotype_names, collapse = ", "), ".\n", sep = "")
 
@@ -452,8 +455,8 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
       saveRDS(fit_list, file = file.path(configs[["results.dir"]], "fit_list.rds"))
     }
 
-    if (early_stopping && validation && check_early_stopping_condition(ilam, metric_val, AUC_val, traits = early_stopping_phenotypes)) {
-      cat("Early stopping. None of the phenotype metrics of interest is improving anymore. DONE. \n")
+    if (early_stopping && validation && check_early_stopping_condition(ilam, metric_val, AUC_val, traits = early_stopping_phenotypes, weight = weight, check_average = early_stopping_check_average)) {
+      cat("Early stopping. Phenotype metrics of interest is not improving anymore.\n")
       break
     }
 

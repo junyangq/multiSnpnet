@@ -871,33 +871,75 @@ safe_product <- function(X, Y, MAXLEN = (2^31 - 1) / 2, use_safe = TRUE) {
   out
 }
 
+#' weighted row means
+#'
+#' @param M matrix
+#' @param w weights as a named list
+#'
+weighted_rowMeans <- function(M, w){
+  w <- w / sum(w)
+  as.matrix(M[, names(w)]) %*% as.matrix(w)
+}
+
 
 #' Check if the early stopping condition is satisfied
+#'
+#' For the specified traits, we check if the validation set metric (and validation set AUC) has been decreasing in the last two steps. If also check if the average of the validation set metric and the validation set AUC has been decreasing in the last two steps. If no traits were provided, we check it for all the traits considered in SRRR.
 #'
 #' @param ilam Lambda index
 #' @param metric_val Validation set metric
 #' @param AUC_val Validation set AUC
 #' @param traits (optional) subset of traits
+#' @param weight weights (named list) for the weighted average computation.
+#' @param check_average whether to check the average of the metrics
+#' @param stopping.lag how many iterations shall we wait after the argmax until we stop
 #'
 #' @export
-check_early_stopping_condition <- function(ilam, metric_val, AUC_val = NULL, traits = NULL){
+check_early_stopping_condition <- function(ilam, metric_val, AUC_val = NULL, traits = NULL, weight = NULL, check_average = TRUE, stopping.lag = 2){
+  if(stopping.lag < 0) stopping.lag <- 0
+  if(ilam <= stopping.lag){
+    return(FALSE)
+  }
   if(is.null(traits)){
     traits <- colnames(metric_val)
   }
-  if(is.null(AUC_val) || ncol(AUC_val) == 0){
-    return(
-      ilam > 2 &&
-      all(metric_val[ilam,   traits] < metric_val[ilam-1, traits]) &&
-      all(metric_val[ilam-1, traits] < metric_val[ilam-2, traits])
-    )
+  if(is.null(weight)){
+    weight <- setNames(rep(1, ncol(metric_val)), colnames(metric_val))
+  }
+  check_AUC <- ((! is.null(AUC_val)) && ncol(AUC_val) > 0)
+
+  metric_val_traits <- as.matrix(metric_val[, traits])
+  max_argmax_metric_val_traits <- max(apply(metric_val_traits, 2, which.max))
+  argmax_mean_metric_val <- which.max(weighted_rowMeans(metric_val, weight))
+
+  if(check_AUC){
+    AUC_val_traits <- as.matrix(AUC_val[, traits])
+    max_argmax_AUC_val_traits <- max(apply(AUC_val_traits, 2, which.max))
+    argmax_mean_AUC_val <- which.max(weighted_rowMeans(AUC_val, weight[colnames(AUC_val)]))
+    if(check_average){
+      return(
+        argmax_mean_metric_val       + stopping.lag <= ilam &&
+        argmax_mean_AUC_val          + stopping.lag <= ilam &&
+        max_argmax_metric_val_traits + stopping.lag <= ilam &&
+        max_argmax_AUC_val_traits    + stopping.lag <= ilam
+      )
+    }else{
+      return(
+        max_argmax_metric_val_traits + stopping.lag <= ilam &&
+        max_argmax_AUC_val_traits    + stopping.lag <= ilam
+      )
+    }
   }else{
-    return(
-      ilam > 2 &&
-      all(metric_val[ilam,   traits] < metric_val[ilam-1, traits]) &&
-      all(metric_val[ilam-1, traits] < metric_val[ilam-2, traits]) &&
-      all(AUC_val[   ilam,   traits] < AUC_val[   ilam-1, traits]) &&
-      all(AUC_val[   ilam-1, traits] < AUC_val[   ilam-2, traits])
-    )
+    if(check_average){
+      return(
+        argmax_mean_metric_val       + stopping.lag <= ilam &&
+        max_argmax_metric_val_traits + stopping.lag <= ilam
+      )
+    }else{
+      return(
+        max_argmax_metric_val_traits + stopping.lag <= ilam
+      )
+    }
   }
 }
 
