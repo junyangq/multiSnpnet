@@ -1329,7 +1329,57 @@ get_summary_metrics <- function(
 #'
 #' @export
 get_non_zero_coefficients <- function(fit_obj){
-  return(get_non_zero_lines(fit_obj$C))
+  return(as.matrix(get_non_zero_lines(fit_obj$C)))
+}
+
+
+#' Given a data frame with ID_ALT column, this function separates them into two columns ID and ALT
+#'
+#' @param ID_ALT_df A dataframe with ID_ALT column
+#'
+#' @export
+separate_ID_ALT_into_two_columns <- function(ID_ALT_df){
+  select(
+    mutate(
+      separate(
+        ID_ALT_df,
+        "ID_ALT",
+        c("ID_ALT1", "ID_ALT2", "ALT"),
+        sep = "_",
+        extra = "merge",
+        fill = "left",
+        remove = T
+      ),
+      ID = if_else(is.na(ID_ALT1), ID_ALT2, paste(ID_ALT1, ID_ALT2, sep="_"))
+    ), -ID_ALT1, -ID_ALT2
+  )
+}
+
+
+#' Extract the variant loadings of the SVD of coefficients as a data frame
+#'
+#' @param fit_obj A named list containing the results of the multisnpnet results.
+#' @param component_prefix the prefix of the SVD loadings column
+#' @param rank the rank of SVD
+#'
+#' @export
+tsvd_of_C_variant_loadings_as_data_framte <- function(fit_obj, component_prefix='Component', rank=NULL){
+  tsvd_of_C_with_names(
+    fit_obj, component_prefix, rank
+  ) -> svd_obj
+  separate_ID_ALT_into_two_columns(
+    rownames_to_column(
+      as.data.frame(svd_obj$v),
+      "ID_ALT"
+    )
+  ) -> beta_ID_ALT_df
+  return(select(
+    beta_ID_ALT_df,
+    all_of(c(
+      "ID", "ALT",
+      setdiff(colnames(beta_ID_ALT_df), c("ID", "ALT"))
+    ))
+  ))
 }
 
 
@@ -1340,10 +1390,13 @@ get_non_zero_coefficients <- function(fit_obj){
 #' @param multiSnpnetResults a list containing the results of the multiSnpnet fit
 #' @param fit_obj A named list containing the results of the multisnpnet results.
 #' @param genotype_file Path to the new suite of genotype files. genotype_file.pvar.zst must exist.
+#' @param withTSVD A boolean variable indicating whether to include the SVD loadings on variants
+#' @param component_prefix (applicable when withTSVD is TRUE) the prefix of the SVD loadings column
+#' @param rank (applicable when withTSVD is TRUE) the rank of SVD
 #' @param zstdcat_path Path to zstdcat program, needed when loading variants.
 #'
 #' @export
-get_non_zero_coefficients_as_data_frame <- function(multiSnpnetResults = NULL, fit_obj = NULL, genotype_file = NULL, zstdcat_path = 'zstdcat'){
+get_non_zero_coefficients_as_data_frame <- function(multiSnpnetResults = NULL, fit_obj = NULL, genotype_file = NULL, withTSVD = FALSE, component_prefix='Component', rank = NULL, zstdcat_path = 'zstdcat'){
   if(!is.null(multiSnpnetResults)){
     if(is.null(fit_obj)){
       fit_obj <- multiSnpnetResults[['fit']]
@@ -1352,19 +1405,30 @@ get_non_zero_coefficients_as_data_frame <- function(multiSnpnetResults = NULL, f
       genotype_file <- multiSnpnetResults[['configs']][['genotype_file']]
     }
   }
-  return(inner_join(
+  coeff_df <- inner_join(
     read_pvar(genotype_file, zstdcat_path),
-    select(
-        mutate(
-            separate(
-                rownames_to_column(as.data.frame(as.matrix(get_non_zero_coefficients(fit_obj))), 'ID_ALT'),
-                "ID_ALT", c("ID_ALT1", "ID_ALT2", "ALT"), sep = "_", extra='merge', fill='left', remove=T
-            ),
-            ID = if_else(is.na(ID_ALT1), ID_ALT2, paste(ID_ALT1, ID_ALT2, sep='_'))
-        ), -ID_ALT1, -ID_ALT2
-    ),
-    by = c("ID", "ALT")
-  ))
+    separate_ID_ALT_into_two_columns(
+      rownames_to_column(
+        as.data.frame(get_non_zero_coefficients(fit_obj)),
+        "ID_ALT"
+      )
+    ), by = c("ID", "ALT")
+  )
+  if(withTSVD){
+    if(is.null(rank))
+      rank <- fit_obj$configs$rank
+    tsvd_of_C_variant_loadings_as_data_framte(
+      fit_obj,
+      component_prefix,
+      rank
+    ) -> SVD_loadings_df
+    left_join(
+      coeff_df,
+      SVD_loadings_df,
+      by = c("ID", "ALT")
+    ) -> coeff_df
+  }
+  return(coeff_df)
 }
 
 
