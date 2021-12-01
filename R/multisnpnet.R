@@ -462,5 +462,5 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
 
   }
   class(fit_list) <- "multisnpnet"
-  prepare_multiSnpnetResults(fit_list, metric_train, metric_val, AUC_train, AUC_val, configs)
+  prepare_multiSnpnetResults(fit_list, ilam, metric_train, metric_val, AUC_train, AUC_val, configs)
 }
