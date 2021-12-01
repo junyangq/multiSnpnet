@@ -287,7 +287,8 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
 
   for (ilam in start_lambda:nlambda) {  # consider batch-type algorithm later
     if (early_stopping && validation && check_early_stopping_condition(ilam - 1, metric_val, AUC_val, traits = early_stopping_phenotypes, weight = weight, check_average = early_stopping_check_average)) {
-      cat(sprintf("Early stopping at lambda: %d. Phenotype metrics of interest is not improving anymore.\n", ilam - 1))
+      ilam <- ilam - 1
+      cat(sprintf("Early stopping at lambda: %d. Phenotype metrics of interest is not improving anymore.\n", ilam))
       break
     }
 
