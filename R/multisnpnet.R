@@ -286,6 +286,11 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
   }
 
   for (ilam in start_lambda:nlambda) {  # consider batch-type algorithm later
+    if (early_stopping && validation && check_early_stopping_condition(ilam - 1, metric_val, AUC_val, traits = early_stopping_phenotypes, weight = weight, check_average = early_stopping_check_average)) {
+      cat(sprintf("Early stopping at lambda: %d. Phenotype metrics of interest is not improving anymore.\n", ilam - 1))
+      break
+    }
+
     cat("Current lambda:", ilam, "\n")
     lam <- full_lams[ilam]
     discard <- setdiff(colnames(features_train), c(active, covariate_names))
@@ -454,12 +459,6 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
            file = get_rdata_path(configs[["results.dir"]], ilam))
       saveRDS(fit_list, file = file.path(configs[["results.dir"]], "fit_list.rds"))
     }
-
-    if (early_stopping && validation && check_early_stopping_condition(ilam, metric_val, AUC_val, traits = early_stopping_phenotypes, weight = weight, check_average = early_stopping_check_average)) {
-      cat("Early stopping. Phenotype metrics of interest is not improving anymore.\n")
-      break
-    }
-
   }
   class(fit_list) <- "multisnpnet"
   prepare_multiSnpnetResults(fit_list, ilam, metric_train, metric_val, AUC_train, AUC_val, configs)
