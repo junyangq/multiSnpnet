@@ -74,7 +74,15 @@ multisnpnet <- function(genotype_file, phenotype_file, phenotype_names, binary_p
 
   if (rank > length(phenotype_names)) stop("The specified rank (", rank, ") should not be greater than the number of responses (", length(phenotype_names), ").")
 
-  if(all(sapply(early_stopping_phenotypes, function(p){p %in% phenotype_names}))) stop(sprintf("Some of the specified early stopping phenotypes does not match the phenotype names: %s", paste(early_stopping_phenotypes[! sapply(early_stopping_phenotypes, function(p){p %in% phenotype_names})], collapse = ', ') ))
+  if(! all(sapply(early_stopping_phenotypes, function(p){p %in% phenotype_names}))) {
+    stop(sprintf(
+      "Some of the specified early stopping phenotypes does not match the phenotype names: %s",
+      paste(
+        early_stopping_phenotypes[! sapply(early_stopping_phenotypes, function(p){p %in% phenotype_names})],
+        collapse = ', '
+      )
+    ))
+  }
 
   cat("Start Sparse Reduced Rank Regression for ", paste(phenotype_names, collapse = ", "), ".\n", sep = "")
 
